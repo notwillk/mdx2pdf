@@ -1,0 +1,243 @@
+label: fork-run
+
+table: 79 cases, 6 surprises
+  attribute: 9/9
+  code: 5/5
+  esm: 1/1
+  expression: 21/24
+  inline: 3/4
+  nesting: 16/16
+  prose: 5/7
+  tag errors: 13/13
+  SURPRISE [inline] "<A /> <B />\n"
+    expected Root[P[JsxT(A),T(" "),JsxT(B)]]
+    actual   Root[JsxF(A),JsxF(B)]
+  SURPRISE [expression] "{a\n    b}\n"
+    expected Root[ExprF("a\n    b")]
+    actual   Root[ExprF("a\n  b")]
+  SURPRISE [expression] "| {x | upcase} |\n|---|\n| b |\n"
+    expected Err
+    actual   Root[P[T("| "),ExprT("x | upcase"),T(" |\n|---|\n| b |")]]
+  SURPRISE [expression] "{x | replace: \"}\", \"\"}\n"
+    expected Root[P[ExprT("x | replace: \""),T(", \"\"}")]]
+    actual   Root[P[ExprT("x | replace: \""),T("\", \"\"}")]]
+  SURPRISE [prose] "a < b\n"
+    expected Err
+    actual   Root[P[T("a < b")]]
+  SURPRISE [prose] "A<B\n"
+    expected Err
+    actual   Root[P[T("A<B")]]
+
+positions: 52 of 52 tag and Expression nodes start at their `<` or `{`
+error places: 14 of 14 errors carry a location
+
+liquid callback:
+  "{x | replace: \"}\", \"\"}\n"
+    braces:   Root[P[ExprT("x | replace: \""),T("\", \"\"}")]]
+    callback: Root[ExprF("x | replace: \"}\", \"\"")]
+  "a {x | replace: \"}\", \"\"} b\n"
+    braces:   Root[P[T("a "),ExprT("x | replace: \""),T("\", \"\"} b")]]
+    callback: Root[P[T("a "),ExprT("x | replace: \"}\", \"\""),T(" b")]]
+  "{x | replace: '}', ''}\n"
+    braces:   Root[P[ExprT("x | replace: '"),T("', ''}")]]
+    callback: Root[ExprF("x | replace: '}', ''")]
+  "{x | replace: \"{\", \"\"}\n"
+    braces:   Err: 2:1: Unexpected end of file in expression, expected a corresponding closing brace for `{` (markdown-rs:unexpected-eof)
+    callback: Root[ExprF("x | replace: \"{\", \"\"")]
+  "<A b={x | replace: \"}\", \"\"} />\n"
+    braces:   Err: 1:22: Unexpected character `"` (U+0022) before attribute name, expected a character that can start an attribute name, such as a letter, `$`, or `_`; whitespace before attributes; or the end of the tag (markdown-rs:unexpected-character)
+    callback: Root[JsxF(A b={x | replace: "}", ""})]
+  "<A b={x | replace: \"}\", \"\"}>\ny\n</A>\n"
+    braces:   Err: 1:22: Unexpected character `"` (U+0022) before attribute name, expected a character that can start an attribute name, such as a letter, `$`, or `_`; whitespace before attributes; or the end of the tag (markdown-rs:unexpected-character)
+    callback: Root[JsxF(A b={x | replace: "}", ""})[P[T("y")]]]
+  "{it's}\n"
+    braces:   Root[ExprF("it's")]
+    callback: Err: 2:1: Unexpected end of file in expression (spike:expr)
+  "{\"unclosed}\n"
+    braces:   Root[ExprF("\"unclosed")]
+    callback: Err: 2:1: Unexpected end of file in expression (spike:expr)
+  "{a\n\"b}\"\nc}\n"
+    braces:   Root[P[ExprT("a\n\"b"),T("\"\nc}")]]
+    callback: Root[ExprF("a\n\"b}\"\nc")]
+  "| a |\n|---|\n| {x \\| replace: \"}\", \"\"} |\n"
+    braces:   Root[Table[Row[Cell[T("a")]],Row[Cell[ExprT("x \\| replace: \""),T("\", \"\"}")]]]]
+    callback: Root[Table[Row[Cell[T("a")]],Row[Cell[ExprT("x \\| replace: \"}\", \"\"")]]]]
+  table cases it changes: 1
+    "{x | replace: \"}\", \"\"}\n"
+      braces:   Root[P[ExprT("x | replace: \""),T("\", \"\"}")]]
+      callback: Root[ExprF("x | replace: \"}\", \"\"")]
+
+esm detectors (R = must report, - = must not):
+  R line:ok  refined:ok  rejecting:ok  "import Chart from './Chart.mdx'\n"
+  R line:ok  refined:ok  rejecting:ok  "import './x.css'\n"
+  R line:ok  refined:ok  rejecting:ok  "import {a} from 'b'\n"
+  R line:ok  refined:ok  rejecting:ok  "import * as a from 'b'\n"
+  R line:ok  refined:ok  rejecting:ok  "export const a = 1\n"
+  R line:ok  refined:ok  rejecting:ok  "export default a\n"
+  R line:ok  refined:ok  rejecting:ok  "export function f() {}\n"
+  R line:ok  refined:ok  rejecting:ok  "text\n\nimport a from 'b'\n"
+  - line:BAD refined:ok  rejecting:BAD "import duties rose sharply\n"
+  - line:BAD refined:ok  rejecting:BAD "export the file as a PDF\n"
+  - line:ok  refined:ok  rejecting:ok  "import\n"
+  - line:ok  refined:ok  rejecting:ok  "Important: read this\n"
+  - line:ok  refined:ok  rejecting:ok  "exports rose\n"
+  - line:BAD refined:ok  rejecting:ok  "  import a from 'b'\n"
+  - line:ok  refined:ok  rejecting:ok  "text\nimport a from 'b'\n"
+  - line:ok  refined:ok  rejecting:ok  "> import a from 'b'\n"
+  - line:ok  refined:ok  rejecting:ok  "- import a from 'b'\n"
+  - line:ok  refined:ok  rejecting:ok  "```\nimport a from 'b'\n```\n"
+  - line:ok  refined:ok  rejecting:ok  "`import a from 'b'`\n"
+  score of 19: line 16, refined 19, rejecting callback 17
+
+hostile inputs:
+  "1. ```\n- x\n": Root[OL[LI[Code("")]],UL[LI[P[T("x")]]]]
+  "- ```\n1. x\n": Root[UL[LI[Code("")]],OL[LI[P[T("x")]]]]
+  "- ~~~\n1. x\n": Root[UL[LI[Code("")]],OL[LI[P[T("x")]]]]
+  "2) ```\n-": Root[OL[LI[Code("")]],UL[LI]]
+  "\\\n-\n=\n`\n-": Root[H2[T("\\")],H2[T("=\n`")]]
+  "<>]\n-\n": Err: 2:2: Expected a closing tag for `<>` (1:1) before the end of `HeadingSetext` (markdown-rs:end-tag-mismatch)
+  "# t\n  - ```<\n* x|\n": Root[H1[T("t")],UL[LI[Code("")]],UL[LI[P[T("x|")]]]]
+  "<A>\n- ```\n1. x\n</A>\n": Root[JsxF(A)[UL[LI[Code("")]],OL[LI[P[T("x")]]]]]
+  "> 1. ```\n> - x\n": Root[Q[OL[LI[Code("")]],UL[LI[P[T("x")]]]]]
+  known document parses the same after 0 caught panics: true
+
+probes:
+  ampersand in an attribute
+    "<Card title=\"AT&T\" />\n": Root[JsxF(Card title="AT&T")]
+    "<Card title=\"Q&A\">\nx\n</Card>\n": Root[JsxF(Card title="Q&A")[P[T("x")]]]
+    "<Card title=\"a&b\" />\n": Root[JsxF(Card title="a&b")]
+    "<Card title=\"a&b c\" />\n": Root[JsxF(Card title="a&b c")]
+    "<Card title=\"a & b\" />\n": Root[JsxF(Card title="a & b")]
+    "<Card title=\"&\" />\n": Root[JsxF(Card title="&")]
+    "<Card title=\"&amp;\" />\n": Root[JsxF(Card title="&")]
+    "<Card title=\"AT&amp;T\" />\n": Root[JsxF(Card title="AT&T")]
+    "<Card title=\"&nosuch;\" />\n": Root[JsxF(Card title="&nosuch;")]
+    "<Card title=\"R&D;\" />\n": Root[JsxF(Card title="R&D;")]
+    "a <Card title=\"AT&T\" /> b\n": Root[P[T("a "),JsxT(Card title="AT&T"),T(" b")]]
+    "<A b=\"&b\">": Err: 1:11: Expected a closing tag for `<A>` (1:1) (markdown-rs:end-tag-mismatch)
+  setext underline after an unclosed tag
+    "<A>hi\n---\n</A>\n": Err: 2:4: Expected a closing tag for `<A>` (1:1) before the end of `HeadingSetext` (markdown-rs:end-tag-mismatch)
+    "<Note>title\n===\n": Err: 2:4: Expected a closing tag for `<Note>` (1:1) before the end of `HeadingSetext` (markdown-rs:end-tag-mismatch)
+    "text <A>\n---\n": Err: 2:4: Expected a closing tag for `<A>` (1:6) before the end of `HeadingSetext` (markdown-rs:end-tag-mismatch)
+    "#<>\n=": Err: 2:2: Expected a closing tag for `<>` (1:2) before the end of `HeadingSetext` (markdown-rs:end-tag-mismatch)
+    "<>o\n=": Err: 2:2: Expected a closing tag for `<>` (1:1) before the end of `HeadingSetext` (markdown-rs:end-tag-mismatch)
+    "<>]\n-\n": Err: 2:2: Expected a closing tag for `<>` (1:1) before the end of `HeadingSetext` (markdown-rs:end-tag-mismatch)
+    "<A>\n---\n</A>\n": Root[JsxF(A)[ThematicBreak]]
+    "<A>hi</A>\n---\n": Root[H2[JsxT(A)[T("hi")]]]
+    "<A />\n---\n": Root[JsxF(A),ThematicBreak]
+    "<A>hi\n\n---\n</A>\n": Err: 1:6: Expected a closing tag for `<A>` (1:1) before the end of `Paragraph` (markdown-rs:end-tag-mismatch)
+  unclosed fence, then another list
+    "- ```\n1. x\n": Root[UL[LI[Code("")]],OL[LI[P[T("x")]]]]
+    "- ```\n  code\n* x\n": Root[UL[LI[Code("code")]],UL[LI[P[T("x")]]]]
+    "- ```\n  code\n  ```\n* x\n": Root[UL[LI[Code("code")]],UL[LI[P[T("x")]]]]
+    "1. ```\n   code\n   ```\n- x\n": Root[OL[LI[Code("code")]],UL[LI[P[T("x")]]]]
+    "a||\n-|-\n1. <": PANIC at to_mdast.rs:1842
+    "c\n-\n=\n`\n-": Root[H2[T("c")],H2[T("=\n`")]]
+  does it read as a tag?
+    "A<B and more\n": Root[P[T("A<B and more")]]
+    "A<B, C\n": Err: 1:4: Unexpected character `,` (U+002C) in name, expected a name character such as letters, digits, `$`, or `_`; whitespace before attributes; or the end of the tag (markdown-rs:unexpected-character)
+    "A<B>\n": Err: 1:5: Expected a closing tag for `<B>` (1:2) before the end of `Paragraph` (markdown-rs:end-tag-mismatch)
+    "x<y and y>z\n": Err: 1:12: Expected a closing tag for `<y>` (1:2) before the end of `Paragraph` (markdown-rs:end-tag-mismatch)
+    "if a<b then\n": Root[P[T("if a<b then")]]
+    "a <b\n": Root[P[T("a <b")]]
+    "a<1\n": Err: 1:3: Unexpected character `1` (U+0031) before name, expected a character that can start a name, such as a letter, `$`, or `_` (markdown-rs:unexpected-character)
+    "3 <4\n": Err: 1:4: Unexpected character `4` (U+0034) before name, expected a character that can start a name, such as a letter, `$`, or `_` (markdown-rs:unexpected-character)
+    "AT<T\n": Root[P[T("AT<T")]]
+    "List<String>\n": Err: 1:13: Expected a closing tag for `<String>` (1:5) before the end of `Paragraph` (markdown-rs:end-tag-mismatch)
+    "Vec<u8> here\n": Err: 1:13: Expected a closing tag for `<u8>` (1:4) before the end of `Paragraph` (markdown-rs:end-tag-mismatch)
+    "a {b} <\n": Root[P[T("a "),ExprT("b"),T(" <")]]
+  unterminated tags: an error, or silently text?
+    "<Card title=\"x\"\n": Root[P[T("<Card title=\"x\"")]]
+    "<Card title=\"x\"\n\nmore\n": Root[P[T("<Card title=\"x\"")],P[T("more")]]
+    "<Card\n": Root[P[T("<Card")]]
+    "<Card title=\"x\" b\n": Root[P[T("<Card title=\"x\" b")]]
+    "a <Card title=\"x\" b\n": Root[P[T("a <Card title=\"x\" b")]]
+    "a <Card title=\"x\" b c\n\nmore\n": Root[P[T("a <Card title=\"x\" b c")],P[T("more")]]
+    "<Card title=\"x\n": Err: 1:15: Unexpected end of file in attribute value, expected a corresponding closing quote `"` (U+0022) (markdown-rs:unexpected-eof)
+    "a <Card b={1}\n": Root[P[T("a <Card b="),ExprT("1")]]
+    "<Card b={1\n": Err: 2:1: Unexpected end of file in expression, expected a corresponding closing brace for `{` (markdown-rs:unexpected-eof)
+    "<Card />trailing\n": Root[P[JsxT(Card),T("trailing")]]
+    "<Card /> trailing\n": Root[P[JsxT(Card),T(" trailing")]]
+  filter pipes in tables
+    "| a |\n|---|\n| {x | upcase} |\n": Err: 3:5: Unexpected end of file in expression, expected a corresponding closing brace for `{` (markdown-rs:unexpected-eof)
+    "| a | b |\n|---|---|\n| {x | upcase} |\n": Err: 3:5: Unexpected end of file in expression, expected a corresponding closing brace for `{` (markdown-rs:unexpected-eof)
+    "| {x | upcase} |\n|---|\n| b |\n": Root[P[T("| "),ExprT("x | upcase"),T(" |\n|---|\n| b |")]]
+    "| {x | upcase} | c |\n|---|---|\n| b | d |\n": Root[P[T("| "),ExprT("x | upcase"),T(" | c |\n|---|---|\n| b | d |")]]
+    "| {x | upcase} |\n|---|---|\n| b | d |\n": Err: 1:5: Unexpected end of file in expression, expected a corresponding closing brace for `{` (markdown-rs:unexpected-eof)
+    "| {x \\| upcase} |\n|---|\n| b |\n": Root[Table[Row[Cell[ExprT("x \\| upcase")]],Row[Cell[T("b")]]]]
+    "| a |\n|---|\n| {x \\| upcase} |\n": Root[Table[Row[Cell[T("a")]],Row[Cell[ExprT("x \\| upcase")]]]]
+    "| a |\n|---|\n| {x} |\n": Root[Table[Row[Cell[T("a")]],Row[Cell[ExprT("x")]]]]
+    "| a |\n|---|\n| <A b={x \\| y} /> |\n": Root[Table[Row[Cell[T("a")]],Row[Cell[JsxT(A b={x \| y})]]]]
+    "| a |\n|---|\n| <A b={x | y} /> |\n": Err: 3:10: Unexpected end of file in expression, expected a corresponding closing brace for `{` (markdown-rs:unexpected-eof)
+  whitespace in Expressions
+    "{x\n\n}\n": Root[ExprF("x\n\n")]
+    "{\"a\n    b\"}\n": Root[ExprF("\"a\n  b\"")]
+    "x {a\n    b} y\n": Root[P[T("x "),ExprT("a\n  b"),T(" y")]]
+    "- {a\n      b}\n": Root[UL[LI[ExprF("a\n  b")]]]
+    "{  x  }\n": Root[ExprF("  x  ")]
+    "{\na\n}\n": Root[ExprF("\na\n")]
+  tags that aren't alone on their line
+    "<A /> x\n": Root[P[JsxT(A),T(" x")]]
+    "x <A />\n": Root[P[T("x "),JsxT(A)]]
+    "<A>x</A> <B>y</B>\n": Root[P[JsxT(A)[T("x")],T(" "),JsxT(B)[T("y")]]]
+    "<A>x</A>\n<B>y</B>\n": Root[P[JsxT(A)[T("x")],T("\n"),JsxT(B)[T("y")]]]
+    "<A /> {x}\n": Root[JsxF(A),ExprF("x")]
+    "{x} {y}\n": Root[P[ExprT("x"),T(" "),ExprT("y")]]
+
+random: 100000 documents: 51850 trees, 48147 errors, 3 caught panics, 0 malformed shapes, 4 position problems
+  panic x3 at to_mdast.rs:1842: "a||\n-|-\n1. <"
+  position x2 MdxJsxTextElement escapes its parent, first seen in "``>[{x}<A b=\"c\"><a.b />\n](/u)\n| a | b |\n|---|:-:|\n| | "
+  position x2 Text escapes its parent, first seen in "](/u){x}|[b c<>\nimport a from 'b'\n](/u)<A {...b} />](/u)_{x}~~"
+
+mutated: 50000 documents: 25835 trees, 24165 errors, 0 caught panics, 0 malformed shapes, 0 position problems
+
+markdown-heavy: 100000 documents: 91948 trees, 8050 errors, 2 caught panics, 0 malformed shapes, 0 position problems
+  panic x2 at to_mdast.rs:1842: "\"\n:-\n><"
+
+dialect versus markdown, 652 spec examples: 498 same tree, 81 different tree, 73 dialect errors
+    4 error: autolinks off: 480, 481, 526, 538
+   13 error: autolinks off + jsx on: 20, 346, 594, 595, 596, 597, 598, 599, 600, 601, 603, 604, ...
+   32 error: html off: 21, 31, 150, 151, 155, 156, 158, 165, 173, 174, 175, 177, ...
+    3 error: html off + indented code off: 183, 184, 309
+    7 error: html off + jsx on: 187, 494, 613, 615, 623, 642, 643
+   14 error: jsx on: 195, 493, 602, 606, 607, 609, 610, 618, 619, 620, 621, 622, ...
+   27 tree: html off: 149, 152, 153, 154, 157, 159, 160, 161, 162, 163, 164, 166, ...
+    1 tree: html off + indented code off: 191
+    2 tree: html off + jsx on: 148, 614
+   50 tree: indented code off: 1, 2, 3, 5, 6, 7, 8, 18, 36, 48, 49, 69, ...
+    1 tree: jsx on: 91
+dialect error messages:
+    1 Expected a closing tag for `<>` 
+   11 Expected a closing tag for `<a>` 
+    1 Expected a closing tag for `<b2>` 
+    3 Expected a closing tag for `<bar>` 
+    1 Expected a closing tag for `<c2c>` 
+    4 Expected a closing tag for `<div>` 
+    1 Expected a closing tag for `<foo.bar.baz>` 
+    1 Expected a closing tag for `<foo>` 
+    1 Expected a closing tag for `<m:abc>` 
+    1 Expected a closing tag for `<my>` 
+    1 Expected a closing tag for `<style>` 
+    1 Expected the closing tag `</script>` either before the start of `Paragraph` 
+   11 Unexpected character `!` 
+    1 Unexpected character `"` 
+    1 Unexpected character `)` 
+    3 Unexpected character `*` 
+    2 Unexpected character `+` 
+   13 Unexpected character `/` 
+    1 Unexpected character `3` 
+    1 Unexpected character `5` 
+    2 Unexpected character `?` 
+    2 Unexpected character `@` 
+    2 Unexpected character `\` 
+    1 Unexpected character `b` 
+    1 Unexpected character `t` 
+    4 Unexpected closing slash `/` in tag, expected an open tag first
+    1 Unexpected end of file in attribute value, expected a corresponding closing quote `"` 
+error text and location:
+  "<br>\n" at 2:1: Expected a closing tag for `<br>` (1:1)
+  "<A></B>\n" at 1:4: Unexpected closing tag `</B>`, expected corresponding closing tag for `<A>` (1:1)
+  "text\n\n<A>\n" at 4:1: Expected a closing tag for `<A>` (3:1)
+  "a { b\n" at 1:6: Unexpected end of file in expression, expected a corresponding closing brace for `{`
+  "<https://a.b>\n" at 1:8: Unexpected character `/` (U+002F) before local name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a link in MDX, use `[text](url)`)
+  "<!-- x -->\n" at 1:2: Unexpected character `!` (U+0021) before name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a comment in MDX, use `{/* text */}`)

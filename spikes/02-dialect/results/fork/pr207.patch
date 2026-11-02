@@ -1,0 +1,43 @@
+diff --git a/src/construct/partial_whitespace.rs b/src/construct/partial_whitespace.rs
+index 33f416f..937a163 100644
+--- a/src/construct/partial_whitespace.rs
++++ b/src/construct/partial_whitespace.rs
+@@ -7,11 +7,13 @@
+ //!
+ //! ```bnf
+ //! ; Restriction: the start and end here count as an eol in the case of `text`.
++//! ; Restriction: only the whitespace after the eol in the case of `string`.
+ //! whitespace ::= *space_or_tab eol *space_or_tab
+ //! ```
+ //!
+-//! It occurs around line endings and, in the case of text content, it also
+-//! occurs at the start or end of the whole.
++//! In text content, it occurs around line endings and at the start or end of
++//! the whole.
++//! In string content, it occurs after line endings.
+ //!
+ //! Normally this whitespace is ignored.
+ //! In the case of text content, whitespace before a line ending that
+@@ -72,12 +74,18 @@ pub fn resolve_whitespace(tokenizer: &mut Tokenizer, hard_break: bool, trim_whol
+     while index < tokenizer.events.len() {
+         let event = &tokenizer.events[index];
+ 
+-        if event.kind == Kind::Exit && event.name == Name::Data {
++        // Linked data is string content: a title, label, or destination.
++        if event.kind == Kind::Exit
++            && event.name == Name::Data
++            && tokenizer.events[index - 1].link.is_none()
++        {
+             let trim_start = (trim_whole && index == 1)
+                 || (index > 1 && tokenizer.events[index - 2].name == Name::LineEnding);
+-            let trim_end = (trim_whole && index == tokenizer.events.len() - 1)
+-                || (index + 1 < tokenizer.events.len()
+-                    && tokenizer.events[index + 1].name == Name::LineEnding);
++            // String keeps whitespace before line endings.
++            let trim_end = trim_whole
++                && (index == tokenizer.events.len() - 1
++                    || (index + 1 < tokenizer.events.len()
++                        && tokenizer.events[index + 1].name == Name::LineEnding));
+ 
+             trim_data(tokenizer, index, trim_start, trim_end, hard_break);
+         }

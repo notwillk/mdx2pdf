@@ -1,0 +1,46 @@
+label: record
+main-thread default stack first; 1 GiB thread only where that failed. Timeout 20s.
+
+    quote depth    100: tree 0.000s
+    quote depth   1000: tree 0.006s
+    quote depth  10000: tree 0.334s
+    quote depth 100000: timeout (over 20s)
+     list depth    100: tree 0.001s
+     list depth   1000: tree 0.109s
+     list depth  10000: tree 10.596s
+     list depth 100000: timeout (over 20s)
+  ordered depth    100: tree 0.000s
+  ordered depth   1000: tree 0.034s
+  ordered depth  10000: tree 4.963s
+  ordered depth 100000: timeout (over 20s)
+ jsx-text depth    100: tree 0.000s
+ jsx-text depth   1000: tree 0.006s
+ jsx-text depth  10000: tree 0.410s
+ jsx-text depth 100000: timeout (over 20s)
+ jsx-flow depth    100: tree 0.001s
+ jsx-flow depth   1000: tree 0.010s
+ jsx-flow depth  10000: tree 0.801s
+ jsx-flow depth 100000: timeout (over 20s)
+ emphasis depth    100: tree 0.001s
+ emphasis depth   1000: tree 0.069s
+ emphasis depth  10000: tree 16.399s
+ emphasis depth 100000: timeout (over 20s)
+     link depth    100: tree 0.000s
+     link depth   1000: tree 0.001s
+     link depth  10000: tree 0.030s
+     link depth 100000: tree 2.897s
+    brace depth    100: tree 0.000s
+    brace depth   1000: tree 0.000s
+    brace depth  10000: tree 0.000s
+    brace depth 100000: tree 0.004s
+
+scaling, parse time by input size (reported only):
+         prose:  16K tree 0.002s  64K tree 0.008s  256K tree 0.055s  1024K tree 0.435s
+ one-paragraph:  16K tree 0.002s  64K tree 0.007s  256K tree 0.060s  1024K tree 0.380s
+          tags:  16K tree 0.010s  64K tree 0.075s  256K tree 0.450s  1024K tree 8.843s
+   expressions:  16K tree 0.007s  64K tree 0.073s  256K tree 0.616s  1024K tree 13.036s
+ emphasis-open:  16K tree 0.004s  64K tree 0.031s  256K tree 0.099s  1024K tree 0.322s
+      brackets:  16K tree 0.009s  64K tree 0.097s  256K tree 2.200s  1024K tree 42.292s
+     backticks:  16K tree 0.004s  64K tree 0.015s  256K tree 0.078s  1024K tree 0.255s
+          list:  16K tree 0.011s  64K tree 0.102s  256K tree 1.149s  1024K tree 27.374s
+         table:  16K tree 0.042s  64K tree 0.602s  256K tree 13.201s  1024K timeout (over 60s)

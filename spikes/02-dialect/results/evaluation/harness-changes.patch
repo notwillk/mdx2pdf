@@ -1,0 +1,89 @@
+--- a/src/main.rs	2026-11-02 20:50:08.620726340 +0000
++++ b/src/main.rs	2026-11-02 21:16:59.946568294 +0000
+@@ -668,7 +668,7 @@
+         }
+     };
+ 
+-    let options = dialect();
++    let options = dialect_liquid();
+     let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
+     let mut random = Counts::default();
+     for _ in 0..100_000 {
+@@ -856,7 +856,7 @@
+             let validate = args.get(4).map(String::as_str) == Some("validate");
+             let work = move || {
+                 let start = Instant::now();
+-                let result = catch_unwind(AssertUnwindSafe(|| to_mdast(&input, &dialect())));
++                let result = catch_unwind(AssertUnwindSafe(|| to_mdast(&input, &dialect_liquid())));
+                 let parsed = start.elapsed();
+                 let note = match &result {
+                     Ok(Ok(tree)) => {
+@@ -957,6 +957,7 @@
+         Some("run") => run_suites(&args[1]),
+         Some("deep") => run_deep(&args[1]),
+         Some("child") => child(&args[1..]),
++        Some("extra") => extra(),
+         Some("one") => {
+             for input in &args[1..] {
+                 let input = input.replace("\\n", "\n");
+@@ -967,3 +968,60 @@
+         _ => eprintln!("usage: spike-dialect run|deep <label>"),
+     }
+ }
++
++fn esm_stricter(tree: &Node, input: &str) -> bool {
++    let quoted_from = |rest: &str| rest.split(" from ").skip(1).any(|t| t.trim_start().starts_with(['"', '\'']));
++    let looks = |line: &str| {
++        let Some((word, rest)) = line.split_once(' ') else { return false };
++        let rest = rest.trim();
++        match word {
++            "import" => rest.starts_with(['"', '\'', '{', '*']) || quoted_from(rest),
++            "export" => ["const ", "let ", "var ", "function ", "class ", "default ", "async "].iter().any(|k| rest.starts_with(k)) || rest.starts_with(['{', '*']),
++            _ => false,
++        }
++    };
++    tree.children().is_some_and(|c| c.iter().any(|n| {
++        let Node::Paragraph(p) = n else { return false };
++        let Some(pos) = p.position.as_ref().filter(|x| x.start.column == 1) else { return false };
++        looks(input[pos.start.offset..].lines().next().unwrap_or(""))
++    }))
++}
++
++fn extra() {
++    println!("--- ESM: (want) refined stricter | input");
++    for (input, want) in [
++        ("import duties from China rose sharply\n", false),
++        ("import data from sources\n", false),
++        ("import the data from the server\n", false),
++        ("import from China fell\n", false),
++        ("export default settings are fine\n", false),
++        ("export class action lawsuits\n", false),
++        ("export all files from this folder\n", false),
++        ("import {\n  a\n} from 'b'\n", true),
++        ("import a, {b} from 'c'\n", true),
++        ("import a from \"b\";\n", true),
++        ("import * as a from 'b'\n", true),
++        ("export {a}\n", true),
++        ("export * from 'a'\n", true),
++        ("export default function () {}\n", true),
++        ("export const a = {b: 1}\n", true),
++    ] {
++        let tree = parse(input, &dialect());
++        let (refined, stricter) = match &tree { Outcome::Tree(t) => (esm_refined_check(t, input), esm_stricter(t, input)), _ => (false, false) };
++        let mark = |got: bool| if got == want { "ok " } else { "BAD" };
++        println!("  ({}) {} {} | {input:?} [{}]", if want { "R" } else { "-" }, mark(refined), mark(stricter), match &tree { Outcome::Tree(_) => "tree", Outcome::Error(_) => "parse error", Outcome::Panic(_) => "panic" });
++    }
++    println!("--- the callback on quotes, compared with brace matching");
++    for input in [
++        "{it's}\n\nsecond paragraph\n\nthird paragraph\n",
++        "{it's} and {don't}\n",
++        "{it's}\n\nthe author's note\n\n{y}\n",
++        "Use {x | default: \"it's\"} ok\n",
++        "<A b={it's} />\n\nmore\n",
++        "{a | b: 'x}\n\nlater {c}\n\nlater 'y}\n",
++        "| a |\n|---|\n| {it's} |\n",
++        "a {b\n\nc} d\n",
++    ] {
++        println!("  {input:?}\n    braces:   {}\n    callback: {}", describe(&parse(input, &dialect())), describe(&parse(input, &dialect_liquid())));
++    }
++}

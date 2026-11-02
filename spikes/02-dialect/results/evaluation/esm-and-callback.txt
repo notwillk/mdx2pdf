@@ -1,0 +1,41 @@
+--- ESM: (want) refined stricter | input
+  (-) BAD ok  | "import duties from China rose sharply\n" [tree]
+  (-) BAD ok  | "import data from sources\n" [tree]
+  (-) BAD ok  | "import the data from the server\n" [tree]
+  (-) ok  ok  | "import from China fell\n" [tree]
+  (-) BAD BAD | "export default settings are fine\n" [tree]
+  (-) BAD BAD | "export class action lawsuits\n" [tree]
+  (-) ok  ok  | "export all files from this folder\n" [tree]
+  (R) ok  ok  | "import {\n  a\n} from 'b'\n" [tree]
+  (R) ok  ok  | "import a, {b} from 'c'\n" [tree]
+  (R) ok  ok  | "import a from \"b\";\n" [tree]
+  (R) ok  ok  | "import * as a from 'b'\n" [tree]
+  (R) ok  ok  | "export {a}\n" [tree]
+  (R) ok  ok  | "export * from 'a'\n" [tree]
+  (R) ok  ok  | "export default function () {}\n" [tree]
+  (R) ok  ok  | "export const a = {b: 1}\n" [tree]
+--- the callback on quotes, compared with brace matching
+  "{it's}\n\nsecond paragraph\n\nthird paragraph\n"
+    braces:   Root[ExprF("it's"),P[T("second paragraph")],P[T("third paragraph")]]
+    callback: Err: 6:1: Unexpected end of file in expression (spike:expr)
+  "{it's} and {don't}\n"
+    braces:   Root[P[ExprT("it's"),T(" and "),ExprT("don't")]]
+    callback: Root[ExprF("it's} and {don't")]
+  "{it's}\n\nthe author's note\n\n{y}\n"
+    braces:   Root[ExprF("it's"),P[T("the author's note")],ExprF("y")]
+    callback: Err: 6:1: Unexpected end of file in expression (spike:expr)
+  "Use {x | default: \"it's\"} ok\n"
+    braces:   Root[P[T("Use "),ExprT("x | default: \"it's\""),T(" ok")]]
+    callback: Root[P[T("Use "),ExprT("x | default: \"it's\""),T(" ok")]]
+  "<A b={it's} />\n\nmore\n"
+    braces:   Root[JsxF(A b={it's}),P[T("more")]]
+    callback: Err: 4:1: Unexpected end of file in expression (spike:expr)
+  "{a | b: 'x}\n\nlater {c}\n\nlater 'y}\n"
+    braces:   Root[ExprF("a | b: 'x"),P[T("later "),ExprT("c")],P[T("later 'y}")]]
+    callback: Root[ExprF("a | b: 'x}\n\nlater {c}\n\nlater 'y")]
+  "| a |\n|---|\n| {it's} |\n"
+    braces:   Root[Table[Row[Cell[T("a")]],Row[Cell[ExprT("it's")]]]]
+    callback: Err: 3:9: Unexpected end of file in expression (spike:expr)
+  "a {b\n\nc} d\n"
+    braces:   Err: 1:5: Unexpected end of file in expression, expected a corresponding closing brace for `{` (markdown-rs:unexpected-eof)
+    callback: Err: 1:5: Unexpected end of file in expression, expected a corresponding closing brace for `{` (markdown-rs:unexpected-eof)

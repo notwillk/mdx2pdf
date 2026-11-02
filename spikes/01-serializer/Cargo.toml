@@ -1,0 +1,17 @@
+# Throwaway. See docs/spikes.md, Spike 1.
+[package]
+name = "spike-serializer"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# Upstream main. Both crates at this commit have the same sources as crates.io
+# markdown 1.0.0 and mdast_util_to_markdown 0.0.2 (checked with diff, see findings).
+markdown = { git = "https://github.com/wooorm/markdown-rs", rev = "1506572f9b406431402928f3a8b3df0b4ae2d8f5" }
+mdast_util_to_markdown = { git = "https://github.com/wooorm/markdown-rs", rev = "1506572f9b406431402928f3a8b3df0b4ae2d8f5" }
+pulldown-cmark = { version = "0.13.6", default-features = false }
+pulldown-cmark-to-cmark = "23.0.0"
+serde_json = "1"
+
+[workspace]

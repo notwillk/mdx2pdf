@@ -1,0 +1,9 @@
+quote 50000 0 validate -> exit=0 result='tree, shape None 18.054s' wall=18s
+quote 100000 0 -> exit=0 result='tree 113.814s' wall=114s
+jsx-text 100000 0 -> exit=0 result='tree 131.244s' wall=132s
+jsx-flow 100000 0 -> exit=0 result='tree 182.312s' wall=183s
+jsx-flow 50000 0 -> exit=0 result='tree 34.291s' wall=34s
+quote 100000 1073741824 validate -> exit=0 result='tree, shape None 122.146s' wall=122s
+quote 100000 0 validate -> exit=134 result='' wall=131s
+jsx-text 100000 0 validate -> exit=134 result='' wall=139s
+DONE

@@ -1,0 +1,9 @@
+shape        size    stock          fork           fork+callback 
+prose        256K    0.052s         0.060s         0.055s        
+tags         256K    0.467s         0.499s         0.482s        
+expressions  256K    0.619s         0.686s         0.626s        
+list         256K    1.346s         1.368s         1.361s        
+brackets     256K    3.044s         3.035s         2.831s        
+table        64K     0.694s         0.760s         0.751s        
+table        256K    17.650s        17.114s        17.849s       
+expressions  1024K   16.446s        14.288s        12.072s       

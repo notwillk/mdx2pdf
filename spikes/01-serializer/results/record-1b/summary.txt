@@ -1,0 +1,57 @@
+label: record-1b
+config: literal_autolinks=false spread_rule=true
+PRD example exact: false
+
+PRD output was:
+# Q3 Report
+
+ > 
+ > **ALPHA**
+ > 
+ > Review **Alpha** before Q3 Report ships.
+
+ > 
+ > **BETA**
+ > 
+ > Review **Beta** before Q3 Report ships.
+
+suite A: 650/652 equal (99.69%) {"equal": 650, "mismatch": 1, "spread_only": 1}; html misses 1; under pulldown-cmark 645/652 (98.93%)
+suite B: 650/652 equal (99.69%) {"equal": 650, "mismatch": 1, "spread_only": 1}; html misses 1; under pulldown-cmark 645/652 (98.93%)
+suite P: 623/624 equal (99.84%) {"equal": 623, "spread_only": 1}; html misses 0; under pulldown-cmark 619/624 (99.20%)
+suite C: 47/47 equal (100.00%) {"equal": 47}; html misses 0; under pulldown-cmark 45/47 (95.74%)
+suite D: 15/15 equal (100.00%) {"equal": 15}; html misses 0; under pulldown-cmark 15/15 (100.00%)
+suite E: 59/59 equal (100.00%) {"equal": 59}; html misses 0; under pulldown-cmark 56/59 (94.92%)
+suite F: 36/40 equal (90.00%) {"equal": 36, "expand_err": 3, "mismatch": 1}; html misses 0; under pulldown-cmark 36/40 (90.00%)
+suite F unexpected: 0
+
+random values, 20000 per container:
+  G prose   beside emphasis  20000/20000 (100.00%)  pulldown 20000/20000
+  G prose   delete           20000/20000 (100.00%)  pulldown 20000/20000
+  G prose   emphasis         20000/20000 (100.00%)  pulldown 20000/20000
+  G prose   heading          20000/20000 (100.00%)  pulldown 20000/20000
+  G prose   link text        20000/20000 (100.00%)  pulldown 20000/20000
+  G prose   loose item       20000/20000 (100.00%)  pulldown 20000/20000
+  G prose   paragraph        20000/20000 (100.00%)  pulldown 20000/20000
+  G prose   quote            20000/20000 (100.00%)  pulldown 20000/20000
+  G prose   strong           20000/20000 (100.00%)  pulldown 20000/20000
+  G prose   table cell       20000/20000 (100.00%)  pulldown 19690/20000
+  G prose   tight item       20000/20000 (100.00%)  pulldown 20000/20000
+  H hostile beside emphasis  19939/20000 (99.69%)  pulldown 19939/20000
+  H hostile delete           19489/20000 (97.44%)  pulldown 19489/20000
+  H hostile emphasis         19489/20000 (97.44%)  pulldown 19489/20000
+  H hostile heading          19939/20000 (99.69%)  pulldown 19939/20000
+  H hostile link text        19939/20000 (99.69%)  pulldown 19939/20000
+  H hostile loose item       19939/20000 (99.69%)  pulldown 19939/20000
+  H hostile paragraph        19939/20000 (99.69%)  pulldown 19939/20000
+  H hostile quote            19939/20000 (99.69%)  pulldown 19939/20000
+  H hostile strong           19489/20000 (97.44%)  pulldown 19489/20000
+  H hostile table cell       19889/20000 (99.44%)  pulldown 19663/20000
+  H hostile tight item       19939/20000 (99.69%)  pulldown 19939/20000
+
+random documents:
+  J GFM     49104/50000 (98.208%)  pulldown 49234/50000 (98.468%)
+  K Dialect 45748/46546 (98.286%)  pulldown 45890/46546 (98.591%)
+  kinds of miss: {("J", "adapter_err"): 6, ("J", "equal"): 604, ("J", "mismatch"): 102, ("J", "panic"): 15, ("J", "serialize_err"): 26, ("J", "spread_only"): 747, ("K", "adapter_err"): 7, ("K", "equal"): 510, ("K", "mismatch"): 96, ("K", "panic"): 14, ("K", "serialize_err"): 22, ("K", "spread_only"): 659}
+
+panics, all suites: 29 (0 in the serializer, the rest in the markdown parser)
+pulldown-cmark panics: 0 reading serialized output, 0 reading the random source documents

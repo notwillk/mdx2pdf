@@ -1,0 +1,10 @@
+# The commits ADR 0004 pins, compared with results/fork/*.patch
+# PR facts from the GitHub API and commit diffs from github.com, 2026-11-02.
+
+PR    base                  commits  files  +/-            pinned commit  commit vs saved patch
+#265  main@1506572          1        2      +27/-1         e26c525bd7     same
+#267  main@1506572          1        2      +93/-2         ccc6ed01ea     same
+#219  main@1506572          2        3      +51/-3         a1129c332d     different: this commit is only the debug_assert change; the fix is in the other commit
+#210  test/link-heading     80       193    +22484/-3193   79d3a45e94     different: the commit also has tests; the saved patch is its source file only
+#205  main@1506572          2        2      +83/-9         44542f924d     different: the commit also has tests/fuzz.rs; the saved patch is its source file only
+#207  test/link-with-title  79       193    +22441/-3195   d2efc4814c     different: the commit also has tests; the saved patch is its source file only

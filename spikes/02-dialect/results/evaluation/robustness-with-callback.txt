@@ -1,0 +1,27 @@
+## stock, with the expression callback on
+random: 100000 documents: 51702 trees, 46822 errors, 1476 caught panics, 0 malformed shapes, 5 position problems
+  panic x1465 at to_mdast.rs:1277: "#<>\n="
+  panic x4 at to_mdast.rs:1817: "a||\n-|-\n1. <"
+  panic x7 at to_mdast.rs:193: "c\n-\n=\n`\n-"
+  position x1 Code escapes its parent, first seen in "\n> \\\n>\n2) ```*<A />\n\n\n\n=\""
+  position x2 MdxJsxTextElement escapes its parent, first seen in "``>[{x}<A b=\"c\"><a.b />\n](/u)\n| a | b |\n|---|:-:|\n| | "
+  position x2 Text escapes its parent, first seen in "](/u){x}|[b c<>\nimport a from 'b'\n](/u)<A {...b} />](/u)_{x}~~"
+mutated: 50000 documents: 25530 trees, 24423 errors, 47 caught panics, 0 malformed shapes, 0 position problems
+  panic x10 at character_reference.rs:196: "<A b=\"&b\">"
+  panic x37 at to_mdast.rs:1277: "<>o\n="
+markdown-heavy: 100000 documents: 91924 trees, 8038 errors, 38 caught panics, 15 malformed shapes, 7 position problems
+  panic x12 at to_mdast.rs:1277: "<>]\n="
+  panic x10 at to_mdast.rs:1817: "- ```\n2) "
+  panic x16 at to_mdast.rs:193: "`\n-\n--\nd\n-"
+  shape x15 List inside List: "* ```\n-"
+  position x7 Code escapes its parent, first seen in "\n===\n\n  - \n    ```&amp;\\ ](/u)**приword \n\n\n# \n* [\n2) \n===\n![b c](/u)a"
+
+## fork, with the expression callback on
+random: 100000 documents: 51708 trees, 48289 errors, 3 caught panics, 0 malformed shapes, 4 position problems
+  panic x3 at to_mdast.rs:1842: "a||\n-|-\n1. <"
+  position x2 MdxJsxTextElement escapes its parent, first seen in "``>[{x}<A b=\"c\"><a.b />\n](/u)\n| a | b |\n|---|:-:|\n| | "
+  position x2 Text escapes its parent, first seen in "](/u){x}|[b c<>\nimport a from 'b'\n](/u)<A {...b} />](/u)_{x}~~"
+mutated: 50000 documents: 25538 trees, 24462 errors, 0 caught panics, 0 malformed shapes, 0 position problems
+markdown-heavy: 100000 documents: 91948 trees, 8050 errors, 2 caught panics, 0 malformed shapes, 0 position problems
+  panic x2 at to_mdast.rs:1842: "\"\n:-\n><"
+

@@ -1,0 +1,28 @@
+to_mdast.rs:1817 (found with gfm)
+  minimal: "2) ```\n-"
+  stock gfm options panic: Some("to_mdast.rs:1817")
+  commonmark options panic: Some("to_mdast.rs:1817")
+  pulldown-cmark panics: false
+to_mdast.rs:193 (found with gfm)
+  minimal: "\\\n-\n=\n`\n-"
+  stock gfm options panic: Some("to_mdast.rs:193")
+  commonmark options panic: Some("to_mdast.rs:193")
+  pulldown-cmark panics: false
+to_mdast.rs:1277 (found with dialect)
+  minimal: "<>]\n-\n"
+  stock gfm options panic: None
+  commonmark options panic: None
+  pulldown-cmark panics: false
+
+probes, gfm options:
+  "1. ```\n- x\n": panic at Some("to_mdast.rs:1817")
+  "- ```\n1. x\n": panic at Some("to_mdast.rs:1817")
+  "- ```\n* x\n": panic at None
+  "1. ```\n2) x\n": panic at None
+  "- ```\n  code\n* x\n": panic at None
+  "- ```\n  code\n  ```\n* x\n": panic at None
+  "1. ```\n   code\n   ```\n- x\n": panic at None
+  "- ~~~\n1. x\n": panic at Some("to_mdast.rs:1817")
+  "> - ```\n> 1. x\n": panic at None
+  "```\n- x\n": panic at None
+  "- ```\n": panic at None

@@ -1,0 +1,559 @@
+# Table suite
+
+[nesting] "- <A>x</A>\n"
+  got: Root[UL[LI[P[JsxT(A)[T("x")]]]]]
+  as expected
+[nesting] "- <A>\n  x\n  </A>\n"
+  got: Root[UL[LI[JsxF(A)[P[T("x")]]]]]
+  as expected
+[nesting] "> <A>x</A>\n"
+  got: Root[Q[P[JsxT(A)[T("x")]]]]
+  as expected
+[nesting] "> <A>\n> x\n> </A>\n"
+  got: Root[Q[JsxF(A)[P[T("x")]]]]
+  as expected
+[nesting] "<A>\n<B>\nx\n</B>\n</A>\n"
+  got: Root[JsxF(A)[JsxF(B)[P[T("x")]]]]
+  as expected
+[nesting] "<A><B>x</B></A>\n"
+  got: Root[P[JsxT(A)[JsxT(B)[T("x")]]]]
+  as expected
+[nesting] "<A>\n<A>\nx\n</A>\n</A>\n"
+  got: Root[JsxF(A)[JsxF(A)[P[T("x")]]]]
+  as expected
+[nesting] "<A>\n\n# h\n\n</A>\n"
+  got: Root[JsxF(A)[H1[T("h")]]]
+  as expected
+[nesting] "<A>\n\none\n\ntwo\n\n</A>\n"
+  got: Root[JsxF(A)[P[T("one")],P[T("two")]]]
+  as expected
+[nesting] "<A>\n- x\n</A>\n"
+  got: Root[JsxF(A)[UL[LI[P[T("x")]]]]]
+  as expected
+[nesting] "<A>\n> x\n</A>\n"
+  got: Root[JsxF(A)[Q[P[T("x")]]]]
+  as expected
+[nesting] "> - <A>\n>   x\n>   </A>\n"
+  got: Root[Q[UL[LI[JsxF(A)[P[T("x")]]]]]]
+  as expected
+[nesting] "<Callout>\n    total\n</Callout>\n"
+  got: Root[JsxF(Callout)[P[T("total")]]]
+  as expected
+[nesting] "<A />\n"
+  got: Root[JsxF(A)]
+  as expected
+[nesting] "> <Content />\n"
+  got: Root[Q[JsxF(Content)]]
+  as expected
+[nesting] "| <A /> |\n|---|\n| b |\n"
+  got: Root[Table[Row[Cell[JsxT(A)]],Row[Cell[T("b")]]]]
+  as expected
+[inline] "<Note>hi</Note>\n"
+  got: Root[P[JsxT(Note)[T("hi")]]]
+  as expected
+[inline] "a <A>b</A> c\n"
+  got: Root[P[T("a "),JsxT(A)[T("b")],T(" c")]]
+  as expected
+[inline] "<A /> <B />\n"
+  got: Root[JsxF(A),JsxF(B)]
+  SURPRISE, expected: Root[P[JsxT(A),T(" "),JsxT(B)]]
+[inline] "<A /> x\n"
+  got: Root[P[JsxT(A),T(" x")]]
+  as expected
+[expression] "{props.name | upcase}\n"
+  got: Root[ExprF("props.name | upcase")]
+  as expected
+[expression] "a {props.name | upcase} b\n"
+  got: Root[P[T("a "),ExprT("props.name | upcase"),T(" b")]]
+  as expected
+[expression] "{a\nb}\n"
+  got: Root[ExprF("a\nb")]
+  as expected
+[expression] "{a\n    b}\n"
+  got: Root[ExprF("a\n  b")]
+  SURPRISE, expected: Root[ExprF("a\n    b")]
+[expression] "> {a\n> b}\n"
+  got: Root[Q[ExprF("a\nb")]]
+  as expected
+[expression] "- {a\n  b}\n"
+  got: Root[UL[LI[ExprF("a\nb")]]]
+  as expected
+[expression] "x {a\nb} y\n"
+  got: Root[P[T("x "),ExprT("a\nb"),T(" y")]]
+  as expected
+[expression] "# {a | b}\n"
+  got: Root[H1[ExprT("a | b")]]
+  as expected
+[expression] "| {x | upcase} |\n|---|\n| b |\n"
+  got: Root[P[T("| "),ExprT("x | upcase"),T(" |\n|---|\n| b |")]]
+  SURPRISE, expected: Err
+[expression] "| a |\n|---|\n| {x \\| upcase} |\n"
+  got: Root[Table[Row[Cell[T("a")]],Row[Cell[ExprT("x \\| upcase")]]]]
+  as expected
+[expression] "| a |\n|---|\n| `x \\| y` |\n"
+  got: Root[Table[Row[Cell[T("a")]],Row[Cell[ICode("x | y")]]]]
+  as expected
+[expression] "{x | replace: \"}\", \"\"}\n"
+  got: Root[P[ExprT("x | replace: \""),T("\", \"\"}")]]
+  SURPRISE, expected: Root[P[ExprT("x | replace: \""),T(", \"\"}")]]
+[expression] "{x | replace: \"a\", \"b\"}\n"
+  got: Root[ExprF("x | replace: \"a\", \"b\"")]
+  as expected
+[expression] "Use {curly} braces\n"
+  got: Root[P[T("Use "),ExprT("curly"),T(" braces")]]
+  as expected
+[expression] "\\{curly\\} braces\n"
+  got: Root[P[T("{curly} braces")]]
+  as expected
+[expression] "\\{curly} braces\n"
+  got: Root[P[T("{curly} braces")]]
+  as expected
+[expression] "a { b\n"
+  got: Err: 1:6: Unexpected end of file in expression, expected a corresponding closing brace for `{` (markdown-rs:unexpected-eof)
+  as expected
+[expression] "{\n"
+  got: Err: 2:1: Unexpected end of file in expression, expected a corresponding closing brace for `{` (markdown-rs:unexpected-eof)
+  as expected
+[expression] "a } b\n"
+  got: Root[P[T("a } b")]]
+  as expected
+[expression] "}\n"
+  got: Root[P[T("}")]]
+  as expected
+[expression] "{/* comment */}\n"
+  got: Root[ExprF("/* comment */")]
+  as expected
+[expression] "a {/* comment */} b\n"
+  got: Root[P[T("a "),ExprT("/* comment */"),T(" b")]]
+  as expected
+[expression] "{}\n"
+  got: Root[ExprF("")]
+  as expected
+[expression] "{{ x }}\n"
+  got: Root[ExprF("{ x }")]
+  as expected
+[attribute] "<A b={1} c=\"x\" d />\n"
+  got: Root[JsxF(A b={1} c="x" d)]
+  as expected
+[attribute] "<A {...b} />\n"
+  got: Root[JsxF(A {...b})]
+  as expected
+[attribute] "<A c='x' />\n"
+  got: Root[JsxF(A c="x")]
+  as expected
+[attribute] "<A b={meta.items | first} />\n"
+  got: Root[JsxF(A b={meta.items | first})]
+  as expected
+[attribute] "<A b=\"a&amp;b\" />\n"
+  got: Root[JsxF(A b="a&b")]
+  as expected
+[attribute] "<A b=\"&#"
+  got: Err: 1:9: Unexpected end of file in attribute value, expected a corresponding closing quote `"` (U+0022) (markdown-rs:unexpected-eof)
+  as expected
+[attribute] "<A b=\"x\ny\" />\n"
+  got: Root[JsxF(A b="x
+y")]
+  as expected
+[attribute] "<A style={{color: \"red\"}} />\n"
+  got: Root[JsxF(A style={{color: "red"}})]
+  as expected
+[attribute] "a <A b={1} c=\"x\" d /> e\n"
+  got: Root[P[T("a "),JsxT(A b={1} c="x" d),T(" e")]]
+  as expected
+[tag errors] "<br>\n"
+  got: Err: 2:1: Expected a closing tag for `<br>` (1:1) (markdown-rs:end-tag-mismatch)
+  as expected
+[tag errors] "<div>\n"
+  got: Err: 2:1: Expected a closing tag for `<div>` (1:1) (markdown-rs:end-tag-mismatch)
+  as expected
+[tag errors] "<!-- x -->\n"
+  got: Err: 1:2: Unexpected character `!` (U+0021) before name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a comment in MDX, use `{/* text */}`) (markdown-rs:unexpected-character)
+  as expected
+[tag errors] "<https://a.b>\n"
+  got: Err: 1:8: Unexpected character `/` (U+002F) before local name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a link in MDX, use `[text](url)`) (markdown-rs:unexpected-character)
+  as expected
+[tag errors] "a <https://a.b> b\n"
+  got: Err: 1:10: Unexpected character `/` (U+002F) before local name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a link in MDX, use `[text](url)`) (markdown-rs:unexpected-character)
+  as expected
+[tag errors] "<A>*b</A>*\n"
+  got: Err: 1:6: Expected the closing tag `</A>` either before the start of `Emphasis` (1:4), or another opening tag after that start (markdown-rs:end-tag-mismatch)
+  as expected
+[tag errors] "<A></B>\n"
+  got: Err: 1:4-1:8: Unexpected closing tag `</B>`, expected corresponding closing tag for `<A>` (1:1) (markdown-rs:end-tag-mismatch)
+  as expected
+[tag errors] "<A>\n"
+  got: Err: 2:1: Expected a closing tag for `<A>` (1:1) (markdown-rs:end-tag-mismatch)
+  as expected
+[tag errors] "a <A> b\n"
+  got: Err: 1:8: Expected a closing tag for `<A>` (1:3) before the end of `Paragraph` (markdown-rs:end-tag-mismatch)
+  as expected
+[tag errors] "</A>\n"
+  got: Err: 1:2: Unexpected closing slash `/` in tag, expected an open tag first (markdown-rs:unexpected-closing-slash)
+  as expected
+[tag errors] "<>x</>\n"
+  got: Root[P[JsxT(<>)[T("x")]]]
+  as expected
+[tag errors] "<a.b />\n"
+  got: Root[JsxF(a.b)]
+  as expected
+[tag errors] "<a:b />\n"
+  got: Root[JsxF(a:b)]
+  as expected
+[prose] "a < b\n"
+  got: Root[P[T("a < b")]]
+  SURPRISE, expected: Err
+[prose] "1<2\n"
+  got: Err: 1:3: Unexpected character `2` (U+0032) before name, expected a character that can start a name, such as a letter, `$`, or `_` (markdown-rs:unexpected-character)
+  as expected
+[prose] "A<B\n"
+  got: Root[P[T("A<B")]]
+  SURPRISE, expected: Err
+[prose] "a > b\n"
+  got: Root[P[T("a > b")]]
+  as expected
+[prose] "\\<div>\n"
+  got: Root[P[T("<div>")]]
+  as expected
+[prose] "    total\n"
+  got: Root[P[T("total")]]
+  as expected
+[prose] "https://a.b\n"
+  got: Root[P[T("https://a.b")]]
+  as expected
+[esm] "import Chart from './Chart.mdx'\n"
+  got: Root[P[T("import Chart from './Chart.mdx'")]]
+  as expected
+[code] "`<A />`\n"
+  got: Root[P[ICode("<A />")]]
+  as expected
+[code] "`{x}`\n"
+  got: Root[P[ICode("{x}")]]
+  as expected
+[code] "```\n<A />\n```\n"
+  got: Root[Code("<A />")]
+  as expected
+[code] "```\n{x}\n```\n"
+  got: Root[Code("{x}")]
+  as expected
+[code] "```\n<A>\n```\n"
+  got: Root[Code("<A>")]
+  as expected
+
+# Brace counting versus the Liquid callback
+
+
+(random documents are reproducible from the seed in robustness())
+
+# Dialect versus Markdown
+
+example 1 [indented code off] "\tfoo\tbaz\t\tbim\n"
+  dialect: Root[P[T("foo\tbaz\t\tbim")]]
+example 2 [indented code off] "  \tfoo\tbaz\t\tbim\n"
+  dialect: Root[P[T("foo\tbaz\t\tbim")]]
+example 3 [indented code off] "    a\ta\n    ὐ\ta\n"
+  dialect: Root[P[T("a\ta\nὐ\ta")]]
+example 5 [indented code off] "- foo\n\n\t\tbar\n"
+  dialect: Root[UL[LI[P[T("foo")],P[T("\tbar")]]]]
+example 6 [indented code off] ">\t\tfoo\n"
+  dialect: Root[Q[P[T("\tfoo")]]]
+example 7 [indented code off] "-\t\tfoo\n"
+  dialect: Root[UL[LI[P[T("\tfoo")]]]]
+example 8 [indented code off] "    foo\n\tbar\n"
+  dialect: Root[P[T("foo\nbar")]]
+example 18 [indented code off] "    \\[\\]\n"
+  dialect: Root[P[T("[]")]]
+example 20 [autolinks off + jsx on] "<https://example.com?find=\\*>\n"
+  dialect: Unexpected character `/` (U+002F) before local name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a link in MDX, use `[text](url)`)
+example 21 [html off] "<a href=\"/bar\\/)\">\n"
+  dialect: Expected a closing tag for `<a>` (1:1)
+example 31 [html off] "<a href=\"&ouml;&ouml;.html\">\n"
+  dialect: Expected a closing tag for `<a>` (1:1)
+example 36 [indented code off] "    f&ouml;f&ouml;\n"
+  dialect: Root[P[T("föfö")]]
+example 48 [indented code off] "    ***\n"
+  dialect: Root[ThematicBreak]
+example 49 [indented code off] "Foo\n    ***\n"
+  dialect: Root[P[T("Foo")],ThematicBreak]
+example 69 [indented code off] "    # foo\n"
+  dialect: Root[H1[T("foo")]]
+example 70 [indented code off] "foo\n    # bar\n"
+  dialect: Root[P[T("foo")],H1[T("bar")]]
+example 85 [indented code off] "    Foo\n    ---\n\n    Foo\n---\n"
+  dialect: Root[H2[T("Foo")],H2[T("Foo")]]
+example 87 [indented code off] "Foo\n    ---\n"
+  dialect: Root[H2[T("Foo")]]
+example 91 [jsx on] "`Foo\n----\n`\n\n<a title=\"a lot\n---\nof dashes\"/>\n"
+  dialect: Root[H2[T("`Foo")],P[T("`")],JsxF(a title="a lot
+---
+of dashes")]
+example 100 [indented code off] "    foo\n---\n"
+  dialect: Root[H2[T("foo")]]
+example 107 [indented code off] "    a simple\n      indented code block\n"
+  dialect: Root[P[T("a simple\nindented code block")]]
+example 110 [indented code off] "    <a/>\n    *hi*\n\n    - one\n"
+  dialect: Root[JsxF(a),P[Em[T("hi")]],UL[LI[P[T("one")]]]]
+example 111 [indented code off] "    chunk1\n\n    chunk2\n  \n \n \n    chunk3\n"
+  dialect: Root[P[T("chunk1")],P[T("chunk2")],P[T("chunk3")]]
+example 112 [indented code off] "    chunk1\n      \n      chunk2\n"
+  dialect: Root[P[T("chunk1")],P[T("chunk2")]]
+example 114 [indented code off] "    foo\nbar\n"
+  dialect: Root[P[T("foo\nbar")]]
+example 115 [indented code off] "# Heading\n    foo\nHeading\n------\n    foo\n----\n"
+  dialect: Root[H1[T("Heading")],H2[T("foo\nHeading")],H2[T("foo")]]
+example 116 [indented code off] "        foo\n    bar\n"
+  dialect: Root[P[T("foo\nbar")]]
+example 117 [indented code off] "\n    \n    foo\n    \n\n"
+  dialect: Root[P[T("foo")]]
+example 118 [indented code off] "    foo  \n"
+  dialect: Root[P[T("foo")]]
+example 134 [indented code off] "    ```\n    aaa\n    ```\n"
+  dialect: Root[Code("aaa")]
+example 137 [indented code off] "```\naaa\n    ```\n"
+  dialect: Root[Code("aaa")]
+example 148 [html off + jsx on] "<table><tr><td>\n<pre>\n**Hello**,\n\n_world_.\n</pre>\n</td></tr></table>\n"
+  dialect: Root[JsxF(table)[JsxF(tr)[JsxF(td)[JsxF(pre)[P[Strong[T("Hello")],T(",")],P[Em[T("world")],T(".")]]]]]]
+example 149 [html off] "<table>\n  <tr>\n    <td>\n           hi\n    </td>\n  </tr>\n</table>\n\nokay.\n"
+  dialect: Root[JsxF(table)[JsxF(tr)[JsxF(td)[P[T("hi")]]]],P[T("okay.")]]
+example 150 [html off] " <div>\n  *hello*\n         <foo><a>\n"
+  dialect: Expected a closing tag for `<a>` (3:15)
+example 151 [html off] "</div>\n*foo*\n"
+  dialect: Unexpected closing slash `/` in tag, expected an open tag first
+example 152 [html off] "<DIV CLASS=\"foo\">\n\n*Markdown*\n\n</DIV>\n"
+  dialect: Root[JsxF(DIV CLASS="foo")[P[Em[T("Markdown")]]]]
+example 153 [html off] "<div id=\"foo\"\n  class=\"bar\">\n</div>\n"
+  dialect: Root[JsxF(div id="foo" class="bar")]
+example 154 [html off] "<div id=\"foo\" class=\"bar\n  baz\">\n</div>\n"
+  dialect: Root[JsxF(div id="foo" class="bar
+baz")]
+example 155 [html off] "<div>\n*foo*\n\n*bar*\n"
+  dialect: Expected a closing tag for `<div>` (1:1)
+example 156 [html off] "<div id=\"foo\"\n*hi*\n"
+  dialect: Unexpected character `*` (U+002A) before attribute name, expected a character that can start an attribute name, such as a letter, `$`, or `_`; whitespace before attributes; or the end of the tag
+example 157 [html off] "<div class\nfoo\n"
+  dialect: Root[P[T("<div class\nfoo")]]
+example 158 [html off] "<div *???-&&&-<---\n*foo*\n"
+  dialect: Unexpected character `*` (U+002A) after name, expected a character that can start an attribute name, such as a letter, `$`, or `_`; whitespace before attributes; or the end of the tag
+example 159 [html off] "<div><a href=\"bar\">*foo*</a></div>\n"
+  dialect: Root[P[JsxT(div)[JsxT(a href="bar")[Em[T("foo")]]]]]
+example 160 [html off] "<table><tr><td>\nfoo\n</td></tr></table>\n"
+  dialect: Root[JsxF(table)[JsxF(tr)[JsxF(td)[P[T("foo")]]]]]
+example 161 [html off] "<div></div>\n``` c\nint x = 33;\n```\n"
+  dialect: Root[JsxF(div),Code("int x = 33;")]
+example 162 [html off] "<a href=\"foo\">\n*bar*\n</a>\n"
+  dialect: Root[JsxF(a href="foo")[P[Em[T("bar")]]]]
+example 163 [html off] "<Warning>\n*bar*\n</Warning>\n"
+  dialect: Root[JsxF(Warning)[P[Em[T("bar")]]]]
+example 164 [html off] "<i class=\"foo\">\n*bar*\n</i>\n"
+  dialect: Root[JsxF(i class="foo")[P[Em[T("bar")]]]]
+example 165 [html off] "</ins>\n*bar*\n"
+  dialect: Unexpected closing slash `/` in tag, expected an open tag first
+example 166 [html off] "<del>\n*foo*\n</del>\n"
+  dialect: Root[JsxF(del)[P[Em[T("foo")]]]]
+example 167 [html off] "<del>\n\n*foo*\n\n</del>\n"
+  dialect: Root[JsxF(del)[P[Em[T("foo")]]]]
+example 168 [html off] "<del>*foo*</del>\n"
+  dialect: Root[P[JsxT(del)[Em[T("foo")]]]]
+example 169 [html off] "<pre language=\"haskell\"><code>\nimport Text.HTML.TagSoup\n\nmain :: IO ()\nmain = print $ parseTags tags\n</code></pre>\nokay\n"
+  dialect: Root[JsxF(pre language="haskell")[JsxF(code)[P[T("import Text.HTML.TagSoup")],P[T("main :: IO ()\nmain = print $ parseTags tags")]]],P[T("okay")]]
+example 170 [html off] "<script type=\"text/javascript\">\n// JavaScript example\n\ndocument.getElementById(\"demo\").innerHTML = \"Hello JavaScript!\";\n</script>\nokay\n"
+  dialect: Root[JsxF(script type="text/javascript")[P[T("// JavaScript example")],P[T("document.getElementById(\"demo\").innerHTML = \"Hello JavaScript!\";")]],P[T("okay")]]
+example 171 [html off] "<textarea>\n\n*foo*\n\n_bar_\n\n</textarea>\n"
+  dialect: Root[JsxF(textarea)[P[Em[T("foo")]],P[Em[T("bar")]]]]
+example 172 [html off] "<style\n  type=\"text/css\">\nh1 {color:red;}\n\np {color:blue;}\n</style>\nokay\n"
+  dialect: Root[JsxF(style type="text/css")[P[T("h1 "),ExprT("color:red;")],P[T("p "),ExprT("color:blue;")]],P[T("okay")]]
+example 173 [html off] "<style\n  type=\"text/css\">\n\nfoo\n"
+  dialect: Expected a closing tag for `<style>` (1:1)
+example 174 [html off] "> <div>\n> foo\n\nbar\n"
+  dialect: Expected a closing tag for `<div>` (1:3) before the end of `BlockQuote`
+example 175 [html off] "- <div>\n- foo\n"
+  dialect: Expected a closing tag for `<div>` (1:3) before the end of `ListItem`
+example 176 [html off] "<style>p{color:red;}</style>\n*foo*\n"
+  dialect: Root[P[JsxT(style)[T("p"),ExprT("color:red;")],T("\n"),Em[T("foo")]]]
+example 177 [html off] "<!-- foo -->*bar*\n*baz*\n"
+  dialect: Unexpected character `!` (U+0021) before name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a comment in MDX, use `{/* text */}`)
+example 178 [html off] "<script>\nfoo\n</script>1. *bar*\n"
+  dialect: Expected the closing tag `</script>` either before the start of `Paragraph` (2:1), or another opening tag after that start
+example 179 [html off] "<!-- Foo\n\nbar\n   baz -->\nokay\n"
+  dialect: Unexpected character `!` (U+0021) before name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a comment in MDX, use `{/* text */}`)
+example 180 [html off] "<?php\n\n  echo '>';\n\n?>\nokay\n"
+  dialect: Unexpected character `?` (U+003F) before name, expected a character that can start a name, such as a letter, `$`, or `_`
+example 181 [html off] "<!DOCTYPE html>\n"
+  dialect: Unexpected character `!` (U+0021) before name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a comment in MDX, use `{/* text */}`)
+example 182 [html off] "<![CDATA[\nfunction matchwo(a,b)\n{\n  if (a < b && a < 0) then {\n    return 1;\n\n  } else {\n\n    return 0;\n  }\n}\n]]>\nokay\n"
+  dialect: Unexpected character `!` (U+0021) before name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a comment in MDX, use `{/* text */}`)
+example 183 [html off + indented code off] "  <!-- foo -->\n\n    <!-- foo -->\n"
+  dialect: Unexpected character `!` (U+0021) before name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a comment in MDX, use `{/* text */}`)
+example 184 [html off + indented code off] "  <div>\n\n    <div>\n"
+  dialect: Expected a closing tag for `<div>` (3:5)
+example 185 [html off] "Foo\n<div>\nbar\n</div>\n"
+  dialect: Root[P[T("Foo")],JsxF(div)[P[T("bar")]]]
+example 186 [html off] "<div>\nbar\n</div>\n*foo*\n"
+  dialect: Root[JsxF(div)[P[T("bar")]],P[Em[T("foo")]]]
+example 187 [html off + jsx on] "Foo\n<a href=\"bar\">\nbaz\n"
+  dialect: Expected a closing tag for `<a>` (2:1)
+example 188 [html off] "<div>\n\n*Emphasized* text.\n\n</div>\n"
+  dialect: Root[JsxF(div)[P[Em[T("Emphasized")],T(" text.")]]]
+example 189 [html off] "<div>\n*Emphasized* text.\n</div>\n"
+  dialect: Root[JsxF(div)[P[Em[T("Emphasized")],T(" text.")]]]
+example 190 [html off] "<table>\n\n<tr>\n\n<td>\nHi\n</td>\n\n</tr>\n\n</table>\n"
+  dialect: Root[JsxF(table)[JsxF(tr)[JsxF(td)[P[T("Hi")]]]]]
+example 191 [html off + indented code off] "<table>\n\n  <tr>\n\n    <td>\n      Hi\n    </td>\n\n  </tr>\n\n</table>\n"
+  dialect: Root[JsxF(table)[JsxF(tr)[JsxF(td)[P[T("Hi")]]]]]
+example 195 [jsx on] "[Foo bar]:\n<my url>\n'title'\n\n[Foo bar]\n"
+  dialect: Expected a closing tag for `<my>` (2:1)
+example 201 [html off] "[foo]: <bar>(baz)\n\n[foo]\n"
+  dialect: Expected a closing tag for `<bar>` (1:8) before the end of `Paragraph`
+example 211 [indented code off] "    [foo]: /url \"title\"\n\n[foo]\n"
+  dialect: Root[Definition,P[LinkReference]]
+example 225 [indented code off] "    aaa\nbbb\n"
+  dialect: Root[P[T("aaa\nbbb")]]
+example 231 [indented code off] "    > # Foo\n    > bar\n    > baz\n"
+  dialect: Root[Q[H1[T("Foo")],P[T("bar\nbaz")]]]
+example 236 [indented code off] ">     foo\n    bar\n"
+  dialect: Root[Q[P[T("foo\nbar")]]]
+example 238 [indented code off] "> foo\n    - bar\n"
+  dialect: Root[Q[P[T("foo")]],UL[LI[P[T("bar")]]]]
+example 252 [indented code off] ">     code\n\n>    not code\n"
+  dialect: Root[Q[P[T("code")]],Q[P[T("not code")]]]
+example 253 [indented code off] "A paragraph\nwith two lines.\n\n    indented code\n\n> A block quote.\n"
+  dialect: Root[P[T("A paragraph\nwith two lines.")],P[T("indented code")],Q[P[T("A block quote.")]]]
+example 254 [indented code off] "1.  A paragraph\n    with two lines.\n\n        indented code\n\n    > A block quote.\n"
+  dialect: Root[OL[LI[P[T("A paragraph\nwith two lines.")],P[T("indented code")],Q[P[T("A block quote.")]]]]]
+example 257 [indented code off] " -    one\n\n     two\n"
+  dialect: Root[UL[LI[P[T("one")]]],P[T("two")]]
+example 264 [indented code off] "- Foo\n\n      bar\n\n\n      baz\n"
+  dialect: Root[UL[LI[P[T("Foo")],P[T("bar")],P[T("baz")]]]]
+example 270 [indented code off] "- foo\n\n      bar\n"
+  dialect: Root[UL[LI[P[T("foo")],P[T("bar")]]]]
+example 271 [indented code off] "  10.  foo\n\n           bar\n"
+  dialect: Root[OL[LI[P[T("foo")],P[T("bar")]]]]
+example 272 [indented code off] "    indented code\n\nparagraph\n\n    more code\n"
+  dialect: Root[P[T("indented code")],P[T("paragraph")],P[T("more code")]]
+example 273 [indented code off] "1.     indented code\n\n   paragraph\n\n       more code\n"
+  dialect: Root[OL[LI[P[T("indented code")],P[T("paragraph")],P[T("more code")]]]]
+example 274 [indented code off] "1.      indented code\n\n   paragraph\n\n       more code\n"
+  dialect: Root[OL[LI[P[T("indented code")],P[T("paragraph")],P[T("more code")]]]]
+example 278 [indented code off] "-\n  foo\n-\n  ```\n  bar\n  ```\n-\n      baz\n"
+  dialect: Root[UL[LI[P[T("foo")]],LI[Code("bar")],LI[P[T("baz")]]]]
+example 286 [indented code off] " 1.  A paragraph\n     with two lines.\n\n         indented code\n\n     > A block quote.\n"
+  dialect: Root[OL[LI[P[T("A paragraph\nwith two lines.")],P[T("indented code")],Q[P[T("A block quote.")]]]]]
+example 287 [indented code off] "  1.  A paragraph\n      with two lines.\n\n          indented code\n\n      > A block quote.\n"
+  dialect: Root[OL[LI[P[T("A paragraph\nwith two lines.")],P[T("indented code")],Q[P[T("A block quote.")]]]]]
+example 288 [indented code off] "   1.  A paragraph\n       with two lines.\n\n           indented code\n\n       > A block quote.\n"
+  dialect: Root[OL[LI[P[T("A paragraph\nwith two lines.")],P[T("indented code")],Q[P[T("A block quote.")]]]]]
+example 289 [indented code off] "    1.  A paragraph\n        with two lines.\n\n            indented code\n\n        > A block quote.\n"
+  dialect: Root[OL[LI[P[T("A paragraph\nwith two lines.")],P[T("indented code")],Q[P[T("A block quote.")]]]]]
+example 290 [indented code off] "  1.  A paragraph\nwith two lines.\n\n          indented code\n\n      > A block quote.\n"
+  dialect: Root[OL[LI[P[T("A paragraph\nwith two lines.")],P[T("indented code")],Q[P[T("A block quote.")]]]]]
+example 308 [html off] "- foo\n- bar\n\n<!-- -->\n\n- baz\n- bim\n"
+  dialect: Unexpected character `!` (U+0021) before name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a comment in MDX, use `{/* text */}`)
+example 309 [html off + indented code off] "-   foo\n\n    notcode\n\n-   foo\n\n<!-- -->\n\n    code\n"
+  dialect: Unexpected character `!` (U+0021) before name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a comment in MDX, use `{/* text */}`)
+example 312 [indented code off] "- a\n - b\n  - c\n   - d\n    - e\n"
+  dialect: Root[UL[LI[P[T("a")]],LI[P[T("b")]],LI[P[T("c")]],LI[P[T("d")]],LI[P[T("e")]]]]
+example 313 [indented code off] "1. a\n\n  2. b\n\n    3. c\n"
+  dialect: Root[OL[LI[P[T("a")]],LI[P[T("b")]],LI[P[T("c")]]]]
+example 344 [html off] "<a href=\"`\">`\n"
+  dialect: Expected a closing tag for `<a>` (1:1) before the end of `Paragraph`
+example 346 [autolinks off + jsx on] "<https://foo.bar.`baz>`\n"
+  dialect: Unexpected character `/` (U+002F) before local name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a link in MDX, use `[text](url)`)
+example 475 [html off] "*<img src=\"foo\" title=\"*\"/>\n"
+  dialect: Root[P[T("*"),JsxT(img src="foo" title="*")]]
+example 476 [html off] "**<a href=\"**\">\n"
+  dialect: Expected a closing tag for `<a>` (1:3) before the end of `Paragraph`
+example 477 [html off] "__<a href=\"__\">\n"
+  dialect: Expected a closing tag for `<a>` (1:3) before the end of `Paragraph`
+example 480 [autolinks off] "**a<https://foo.bar/?q=**>\n"
+  dialect: Unexpected character `/` (U+002F) before local name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a link in MDX, use `[text](url)`)
+example 481 [autolinks off] "__a<https://foo.bar/?q=__>\n"
+  dialect: Unexpected character `/` (U+002F) before local name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a link in MDX, use `[text](url)`)
+example 491 [html off] "[link](<foo\nbar>)\n"
+  dialect: Expected a closing tag for `<foo>` (1:8) before the end of `Paragraph`
+example 493 [jsx on] "[link](<foo\\>)\n"
+  dialect: Unexpected character `\` (U+005C) in name, expected a name character such as letters, digits, `$`, or `_`; whitespace before attributes; or the end of the tag
+example 494 [html off + jsx on] "[a](<b)c\n[a](<b)c>\n[a](<b>c)\n"
+  dialect: Unexpected character `)` (U+0029) in name, expected a name character such as letters, digits, `$`, or `_`; whitespace before attributes; or the end of the tag
+example 524 [html off] "[foo <bar attr=\"](baz)\">\n"
+  dialect: Expected a closing tag for `<bar>` (1:6) before the end of `Paragraph`
+example 526 [autolinks off] "[foo<https://example.com/?search=](uri)>\n"
+  dialect: Unexpected character `/` (U+002F) before local name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a link in MDX, use `[text](url)`)
+example 536 [html off] "[foo <bar attr=\"][ref]\">\n\n[ref]: /uri\n"
+  dialect: Expected a closing tag for `<bar>` (1:6) before the end of `Paragraph`
+example 538 [autolinks off] "[foo<https://example.com/?search=][ref]>\n\n[ref]: /uri\n"
+  dialect: Unexpected character `/` (U+002F) before local name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a link in MDX, use `[text](url)`)
+example 594 [autolinks off + jsx on] "<http://foo.bar.baz>\n"
+  dialect: Unexpected character `/` (U+002F) before local name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a link in MDX, use `[text](url)`)
+example 595 [autolinks off + jsx on] "<https://foo.bar.baz/test?q=hello&id=22&boolean>\n"
+  dialect: Unexpected character `/` (U+002F) before local name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a link in MDX, use `[text](url)`)
+example 596 [autolinks off + jsx on] "<irc://foo.bar:2233/baz>\n"
+  dialect: Unexpected character `/` (U+002F) before local name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a link in MDX, use `[text](url)`)
+example 597 [autolinks off + jsx on] "<MAILTO:FOO@BAR.BAZ>\n"
+  dialect: Unexpected character `@` (U+0040) in local name, expected a name character such as letters, digits, `$`, or `_`; whitespace before attributes; or the end of the tag
+example 598 [autolinks off + jsx on] "<a+b+c:d>\n"
+  dialect: Unexpected character `+` (U+002B) in name, expected a name character such as letters, digits, `$`, or `_`; whitespace before attributes; or the end of the tag
+example 599 [autolinks off + jsx on] "<made-up-scheme://foo,bar>\n"
+  dialect: Unexpected character `/` (U+002F) before local name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a link in MDX, use `[text](url)`)
+example 600 [autolinks off + jsx on] "<https://../>\n"
+  dialect: Unexpected character `/` (U+002F) before local name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a link in MDX, use `[text](url)`)
+example 601 [autolinks off + jsx on] "<localhost:5001/foo>\n"
+  dialect: Unexpected character `5` (U+0035) before local name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a link in MDX, use `[text](url)`)
+example 602 [jsx on] "<https://foo.bar/baz bim>\n"
+  dialect: Unexpected character `/` (U+002F) before local name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a link in MDX, use `[text](url)`)
+example 603 [autolinks off + jsx on] "<https://example.com/\\[\\>\n"
+  dialect: Unexpected character `/` (U+002F) before local name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a link in MDX, use `[text](url)`)
+example 604 [autolinks off + jsx on] "<foo@bar.example.com>\n"
+  dialect: Unexpected character `@` (U+0040) in name, expected a name character such as letters, digits, `$`, or `_`; whitespace before attributes; or the end of the tag (note: to create a link in MDX, use `[text](url)`)
+example 605 [autolinks off + jsx on] "<foo+special@Bar.baz-bar0.com>\n"
+  dialect: Unexpected character `+` (U+002B) in name, expected a name character such as letters, digits, `$`, or `_`; whitespace before attributes; or the end of the tag
+example 606 [jsx on] "<foo\\+@bar.example.com>\n"
+  dialect: Unexpected character `\` (U+005C) in name, expected a name character such as letters, digits, `$`, or `_`; whitespace before attributes; or the end of the tag
+example 607 [jsx on] "<>\n"
+  dialect: Expected a closing tag for `<>` (1:1)
+example 609 [jsx on] "<m:abc>\n"
+  dialect: Expected a closing tag for `<m:abc>` (1:1)
+example 610 [jsx on] "<foo.bar.baz>\n"
+  dialect: Expected a closing tag for `<foo.bar.baz>` (1:1)
+example 613 [html off + jsx on] "<a><bab><c2c>\n"
+  dialect: Expected a closing tag for `<c2c>` (1:9)
+example 614 [html off + jsx on] "<a/><b2/>\n"
+  dialect: Root[JsxF(a),JsxF(b2)]
+example 615 [html off + jsx on] "<a  /><b2\ndata=\"foo\" >\n"
+  dialect: Expected a closing tag for `<b2>` (1:7)
+example 616 [html off] "<a foo=\"bar\" bam = 'baz <em>\"</em>'\n_boolean zoop:33=zoop:33 />\n"
+  dialect: Root[P[T("<a foo=\"bar\" bam = 'baz "),JsxT(em)[T("\"")],T("'\n_boolean zoop:33=zoop:33 />")]]
+example 617 [html off] "Foo <responsive-image src=\"foo.jpg\" />\n"
+  dialect: Root[P[T("Foo "),JsxT(responsive-image src="foo.jpg")]]
+example 618 [jsx on] "<33> <__>\n"
+  dialect: Unexpected character `3` (U+0033) before name, expected a character that can start a name, such as a letter, `$`, or `_`
+example 619 [jsx on] "<a h*#ref=\"hi\">\n"
+  dialect: Unexpected character `*` (U+002A) in attribute name, expected an attribute name character such as letters, digits, `$`, or `_`; `=` to initialize a value; whitespace before attributes; or the end of the tag
+example 620 [jsx on] "<a href=\"hi'> <a href=hi'>\n"
+  dialect: Unexpected end of file in attribute value, expected a corresponding closing quote `"` (U+0022)
+example 621 [jsx on] "< a><\nfoo><bar/ >\n<foo bar=baz\nbim!bop />\n"
+  dialect: Unexpected character `b` (U+0062) before attribute value, expected a character that can start an attribute value, such as `"`, `'`, or `{`
+example 622 [jsx on] "<a href='bar'title=title>\n"
+  dialect: Unexpected character `t` (U+0074) before attribute value, expected a character that can start an attribute value, such as `"`, `'`, or `{`
+example 623 [html off + jsx on] "</a></foo >\n"
+  dialect: Unexpected closing slash `/` in tag, expected an open tag first
+example 624 [jsx on] "</a href=\"foo\">\n"
+  dialect: Unexpected closing slash `/` in tag, expected an open tag first
+example 625 [html off] "foo <!-- this is a --\ncomment - with hyphens -->\n"
+  dialect: Unexpected character `!` (U+0021) before name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a comment in MDX, use `{/* text */}`)
+example 626 [html off] "foo <!--> foo -->\n\nfoo <!---> foo -->\n"
+  dialect: Unexpected character `!` (U+0021) before name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a comment in MDX, use `{/* text */}`)
+example 627 [html off] "foo <?php echo $a; ?>\n"
+  dialect: Unexpected character `?` (U+003F) before name, expected a character that can start a name, such as a letter, `$`, or `_`
+example 628 [html off] "foo <!ELEMENT br EMPTY>\n"
+  dialect: Unexpected character `!` (U+0021) before name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a comment in MDX, use `{/* text */}`)
+example 629 [html off] "foo <![CDATA[>&<]]>\n"
+  dialect: Unexpected character `!` (U+0021) before name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a comment in MDX, use `{/* text */}`)
+example 630 [html off] "foo <a href=\"&ouml;\">\n"
+  dialect: Expected a closing tag for `<a>` (1:5) before the end of `Paragraph`
+example 631 [html off] "foo <a href=\"\\*\">\n"
+  dialect: Expected a closing tag for `<a>` (1:5) before the end of `Paragraph`
+example 632 [jsx on] "<a href=\"\\\"\">\n"
+  dialect: Unexpected character `"` (U+0022) before attribute name, expected a character that can start an attribute name, such as a letter, `$`, or `_`; whitespace before attributes; or the end of the tag
+example 642 [html off + jsx on] "<a href=\"foo  \nbar\">\n"
+  dialect: Expected a closing tag for `<a>` (1:1)
+example 643 [html off + jsx on] "<a href=\"foo\\\nbar\">\n"
+  dialect: Expected a closing tag for `<a>` (1:1)

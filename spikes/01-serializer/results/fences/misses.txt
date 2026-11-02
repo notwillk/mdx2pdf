@@ -1,0 +1,777 @@
+=== A | mismatch | example 20 (Backslash escapes)
+input: "<https://example.com?find=\\*>\n"
+serialized: Some("<https://example.com?find=\\\\*>\n")
+html_equal: Some(false)
+before: ...hildren: [Link { children: [Text { value: "https://example.com?find=\\*", position: None }], position: None, url: "https://example.com?find=\\*", title: None }], position
+after:  ...hildren: [Link { children: [Text { value: "https://example.com?find=\\\\*", position: None }], position: None, url: "https://example.com?find=\\\\*", title: None }], posi
+
+=== A | mismatch | example 39 (Entity and numeric character references)
+input: "foo&#10;&#10;bar\n"
+serialized: Some("foo\n\nbar\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "foo\n\nbar", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "foo", position: None }], position: None }, Paragraph { children: [Text { value: "bar", position: None }], position
+
+=== A | mismatch | example 148 (HTML blocks)
+input: "<table><tr><td>\n<pre>\n**Hello**,\n\n_world_.\n</pre>\n</td></tr></table>\n"
+serialized: Some("<table><tr><td>\n<pre>\n**Hello**,\n\n*world*. </pre>\n\n</td></tr></table>\n")
+html_equal: Some(false)
+before: ... value: "world", position: None }], position: None }, Text { value: ".\n", position: None }, Html { value: "</pre>", position: None }], position: None }, Html { value: "<
+after:  ... value: "world", position: None }], position: None }, Text { value: ". ", position: None }, Html { value: "</pre>", position: None }], position: None }, Html { value: "</
+
+=== A | mismatch | example 168 (HTML blocks)
+input: "<del>*foo*</del>\n"
+serialized: Some("<del>*foo* </del>\n")
+html_equal: Some(false)
+before: ... children: [Text { value: "foo", position: None }], position: None }, Html { value: "</del>", position: None }], position: None }], position: None }
+after:  ... children: [Text { value: "foo", position: None }], position: None }, Text { value: " ", position: None }, Html { value: "</del>", position: None }], position: None }], p
+
+=== A | mismatch | example 187 (HTML blocks)
+input: "Foo\n<a href=\"bar\">\nbaz\n"
+serialized: Some("Foo <a href=\"bar\">\nbaz\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "Foo\n", position: None }, Html { value: "<a href=\"bar\">", position: None }, Text { value: "\nbaz", position: Non
+after:  ...Root { children: [Paragraph { children: [Text { value: "Foo ", position: None }, Html { value: "<a href=\"bar\">", position: None }, Text { value: "\nbaz", position: None
+
+=== A | mismatch | example 194 (Link reference definitions)
+input: "[Foo*bar\\]]:my_(url) 'title (with parens)'\n\n[Foo*bar\\]]\n"
+serialized: Some("[Foo*bar\\]]: my_\\(url\\) \"title (with parens)\"\n\n[Foo\\*bar\\]][Foo*bar\\]]\n")
+html_equal: Some(true)
+before: ...value: "Foo*bar]", position: None }], position: None, reference_kind: Shortcut, identifier: "foo*bar\\]", label: Some("Foo*bar]") }], position: None }], position: None }
+after:  ...value: "Foo*bar]", position: None }], position: None, reference_kind: Full, identifier: "foo*bar\\]", label: Some("Foo*bar]") }], position: None }], position: None }
+
+=== A | mismatch | example 201 (Link reference definitions)
+input: "[foo]: <bar>(baz)\n\n[foo]\n"
+serialized: Some("\\[foo]:  <bar>(baz)\n\n\\[foo]\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "[foo]: ", position: None }, Html { value: "<bar>", position: None }, Text { value: "(baz)", position: None }], pos
+after:  ...Root { children: [Paragraph { children: [Text { value: "[foo]:  ", position: None }, Html { value: "<bar>", position: None }, Text { value: "(baz)", position: None }], po
+
+=== A | mismatch | example 306 (Lists)
+input: "- foo\n\n- bar\n\n\n- baz\n"
+serialized: Some("* foo\n\n* bar\n\n* baz\n")
+html_equal: Some(true)
+before: ... "bar", position: None }], position: None }], position: None, spread: true, checked: None }, ListItem { children: [Paragraph { children: [Text { value: "baz", position: N
+after:  ... "bar", position: None }], position: None }], position: None, spread: false, checked: None }, ListItem { children: [Paragraph { children: [Text { value: "baz", position: 
+
+=== A | mismatch | example 354 (Emphasis and strong emphasis)
+input: "*$*alpha.\n\n*£*bravo.\n\n*€*charlie.\n"
+serialized: Some("\\*\\$\\*alpha.\n\n\\*£&#x62;bravo.\n\n\\*€&#x68;charlie.\n")
+html_equal: Some(false)
+before: ...: None }], position: None }, Paragraph { children: [Text { value: "*£*bravo.", position: None }], position: None }, Paragraph { children: [Text { value: "*€*charlie.", po
+after:  ...: None }], position: None }, Paragraph { children: [Text { value: "*£bbravo.", position: None }], position: None }, Paragraph { children: [Text { value: "*€hcharlie.", po
+
+=== A | panic | example 362 (Emphasis and strong emphasis)
+input: "пристаням_стремятся_\n"
+serialized: None
+html_equal: None
+panicked at /home/vscode/.cargo/git/checkouts/markdown-rs-64faae44d2705efa/1506572/mdast_util_to_markdown/src/state.rs:509:59:
+start byte index 21 is not a char boundary; it is inside 'с' (bytes 20..22 of string)
+
+=== A | mismatch | example 375 (Emphasis and strong emphasis)
+input: "_пристаням_стремятся\n"
+serialized: Some("\\_пристаням&#x44F;стремятся\n")
+html_equal: Some(false)
+before: ...{ children: [Paragraph { children: [Text { value: "_пристаням_стремятся", position: None }], position: None }], position: None }
+after:  ...{ children: [Paragraph { children: [Text { value: "_пристанямястремятся", position: None }], position: None }], position: None }
+
+=== A | mismatch | example 388 (Emphasis and strong emphasis)
+input: "пристаням__стремятся__\n"
+serialized: Some("пристаням&#x441;стремятся__\n")
+html_equal: Some(false)
+before: ... { children: [Paragraph { children: [Text { value: "пристаням__стремятся__", position: None }], position: None }], position: None }
+after:  ... { children: [Paragraph { children: [Text { value: "пристанямсстремятся__", position: None }], position: None }], position: None }
+
+=== A | mismatch | example 401 (Emphasis and strong emphasis)
+input: "__пристаням__стремятся\n"
+serialized: Some("\\_\\_пристаням&#x441;стремятся\n")
+html_equal: Some(false)
+before: ... children: [Paragraph { children: [Text { value: "__пристаням__стремятся", position: None }], position: None }], position: None }
+after:  ... children: [Paragraph { children: [Text { value: "__пристанямсстремятся", position: None }], position: None }], position: None }
+
+=== A | mismatch | example 461 (Emphasis and strong emphasis)
+input: "*_foo_*\n"
+serialized: Some("**foo**\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Emphasis { children: [Emphasis { children: [Text { value: "foo", position: None }], position: None }], position: None }], positio
+after:  ...Root { children: [Paragraph { children: [Strong { children: [Text { value: "foo", position: None }], position: None }], position: None }], position: None }
+
+=== A | mismatch | example 463 (Emphasis and strong emphasis)
+input: "_*foo*_\n"
+serialized: Some("**foo**\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Emphasis { children: [Emphasis { children: [Text { value: "foo", position: None }], position: None }], position: None }], positio
+after:  ...Root { children: [Paragraph { children: [Strong { children: [Text { value: "foo", position: None }], position: None }], position: None }], position: None }
+
+=== A | mismatch | example 475 (Emphasis and strong emphasis)
+input: "*<img src=\"foo\" title=\"*\"/>\n"
+serialized: Some("\\* <img src=\"foo\" title=\"*\"/>\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "*", position: None }, Html { value: "<img src=\"foo\" title=\"*\"/>", position: None }], position: None }], positi
+after:  ...Root { children: [Paragraph { children: [Text { value: "* ", position: None }, Html { value: "<img src=\"foo\" title=\"*\"/>", position: None }], position: None }], posit
+
+=== A | mismatch | example 476 (Emphasis and strong emphasis)
+input: "**<a href=\"**\">\n"
+serialized: Some("\\*\\* <a href=\"**\">\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "**", position: None }, Html { value: "<a href=\"**\">", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "** ", position: None }, Html { value: "<a href=\"**\">", position: None }], position: None }], position: None }
+
+=== A | mismatch | example 477 (Emphasis and strong emphasis)
+input: "__<a href=\"__\">\n"
+serialized: Some("\\_\\_ <a href=\"__\">\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "__", position: None }, Html { value: "<a href=\"__\">", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "__ ", position: None }, Html { value: "<a href=\"__\">", position: None }], position: None }], position: None }
+
+=== A | mismatch | example 491 (Links)
+input: "[link](<foo\nbar>)\n"
+serialized: Some("\\[link]\\( <foo\nbar>)\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "[link](", position: None }, Html { value: "<foo\nbar>", position: None }, Text { value: ")", position: None }], po
+after:  ...Root { children: [Paragraph { children: [Text { value: "[link]( ", position: None }, Html { value: "<foo\nbar>", position: None }, Text { value: ")", position: None }], p
+
+=== A | mismatch | example 494 (Links)
+input: "[a](<b)c\n[a](<b)c>\n[a](<b>c)\n"
+serialized: Some("\\[a]\\(\\<b)c\n\\[a]\\(\\<b)c>\n\\[a]\\( <b>c)\n")
+html_equal: Some(false)
+before: ...dren: [Paragraph { children: [Text { value: "[a](<b)c\n[a](<b)c>\n[a](", position: None }, Html { value: "<b>", position: None }, Text { value: "c)", position: None }], p
+after:  ...dren: [Paragraph { children: [Text { value: "[a](<b)c\n[a](<b)c>\n[a]( ", position: None }, Html { value: "<b>", position: None }, Text { value: "c)", position: None }], 
+
+=== A | mismatch | example 524 (Links)
+input: "[foo <bar attr=\"](baz)\">\n"
+serialized: Some("\\[foo  <bar attr=\"](baz)\">\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "[foo ", position: None }, Html { value: "<bar attr=\"](baz)\">", position: None }], position: None }], position: N
+after:  ...Root { children: [Paragraph { children: [Text { value: "[foo  ", position: None }, Html { value: "<bar attr=\"](baz)\">", position: None }], position: None }], position: 
+
+=== A | mismatch | example 536 (Links)
+input: "[foo <bar attr=\"][ref]\">\n\n[ref]: /uri\n"
+serialized: Some("\\[foo  <bar attr=\"][ref]\">\n\n[ref]: /uri\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "[foo ", position: None }, Html { value: "<bar attr=\"][ref]\">", position: None }], position: None }, Definition {
+after:  ...Root { children: [Paragraph { children: [Text { value: "[foo  ", position: None }, Html { value: "<bar attr=\"][ref]\">", position: None }], position: None }, Definition 
+
+=== A | mismatch | example 554 (Links)
+input: "[*foo* bar][]\n\n[*foo* bar]: /url \"title\"\n"
+serialized: Some("[*foo* bar][foo bar]\n\n[*foo* bar]: /url \"title\"\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [LinkReference { children: [Emphasis { children: [Text { value: "foo", position: None }], position: None }, Text { value: " bar", 
+after:  ...Root { children: [Paragraph { children: [Text { value: "[", position: None }, Emphasis { children: [Text { value: "foo", position: None }], position: None }, Text { value
+
+=== A | mismatch | example 558 (Links)
+input: "[*foo* bar]\n\n[*foo* bar]: /url \"title\"\n"
+serialized: Some("[*foo* bar][foo bar]\n\n[*foo* bar]: /url \"title\"\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [LinkReference { children: [Emphasis { children: [Text { value: "foo", position: None }], position: None }, Text { value: " bar", 
+after:  ...Root { children: [Paragraph { children: [Text { value: "[", position: None }, Emphasis { children: [Text { value: "foo", position: None }], position: None }, Text { value
+
+=== A | mismatch | example 559 (Links)
+input: "[[*foo* bar]]\n\n[*foo* bar]: /url \"title\"\n"
+serialized: Some("\\[[*foo* bar][foo bar]]\n\n[*foo* bar]: /url \"title\"\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "[", position: None }, LinkReference { children: [Emphasis { children: [Text { value: "foo", position: None }], pos
+after:  ...Root { children: [Paragraph { children: [Text { value: "[[", position: None }, Emphasis { children: [Text { value: "foo", position: None }], position: None }, Text { valu
+
+=== A | mismatch | example 564 (Links)
+input: "[foo*]: /url\n\n*[foo*]\n"
+serialized: Some("[foo*]: /url\n\n\\*[foo\\*][foo*]\n")
+html_equal: Some(true)
+before: ...t { value: "foo*", position: None }], position: None, reference_kind: Shortcut, identifier: "foo*", label: Some("foo*") }], position: None }], position: None }
+after:  ...t { value: "foo*", position: None }], position: None, reference_kind: Full, identifier: "foo*", label: Some("foo*") }], position: None }], position: None }
+
+=== A | mismatch | example 573 (Images)
+input: "![foo *bar*]\n\n[foo *bar*]: train.jpg \"train & tracks\"\n"
+serialized: Some("![foo bar]\n\n[foo *bar*]: train.jpg \"train & tracks\"\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [ImageReference { position: None, alt: "foo bar", reference_kind: Shortcut, identifier: "foo*bar*", label: Some("foo bar") }], pos
+after:  ...Root { children: [Paragraph { children: [Text { value: "![foo bar]", position: None }], position: None }, Definition { position: None, url: "train.jpg", title: Some("trai
+
+=== A | mismatch | example 576 (Images)
+input: "![foo *bar*][]\n\n[foo *bar*]: train.jpg \"train & tracks\"\n"
+serialized: Some("![foo bar][]\n\n[foo *bar*]: train.jpg \"train & tracks\"\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [ImageReference { position: None, alt: "foo bar", reference_kind: Collapsed, identifier: "foo*bar*", label: Some("foo bar") }], po
+after:  ...Root { children: [Paragraph { children: [Text { value: "![foo bar][]", position: None }], position: None }, Definition { position: None, url: "train.jpg", title: Some("tr
+
+=== A | mismatch | example 585 (Images)
+input: "![*foo* bar][]\n\n[*foo* bar]: /url \"title\"\n"
+serialized: Some("![foo bar][]\n\n[*foo* bar]: /url \"title\"\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [ImageReference { position: None, alt: "foo bar", reference_kind: Collapsed, identifier: "*foo*bar", label: Some("foo bar") }], po
+after:  ...Root { children: [Paragraph { children: [Text { value: "![foo bar][]", position: None }], position: None }, Definition { position: None, url: "/url", title: Some("title")
+
+=== A | mismatch | example 589 (Images)
+input: "![*foo* bar]\n\n[*foo* bar]: /url \"title\"\n"
+serialized: Some("![foo bar]\n\n[*foo* bar]: /url \"title\"\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [ImageReference { position: None, alt: "foo bar", reference_kind: Shortcut, identifier: "*foo*bar", label: Some("foo bar") }], pos
+after:  ...Root { children: [Paragraph { children: [Text { value: "![foo bar]", position: None }], position: None }, Definition { position: None, url: "/url", title: Some("title"), 
+
+=== A | mismatch | example 603 (Autolinks)
+input: "<https://example.com/\\[\\>\n"
+serialized: Some("<https://example.com/\\\\[\\\\>\n")
+html_equal: Some(false)
+before: ...h { children: [Link { children: [Text { value: "https://example.com/\\[\\", position: None }], position: None, url: "https://example.com/\\[\\", title: None }], position:
+after:  ...h { children: [Link { children: [Text { value: "https://example.com/\\\\[\\\\", position: None }], position: None, url: "https://example.com/\\\\[\\\\", title: None }], p
+
+=== A | mismatch | example 613 (Raw HTML)
+input: "<a><bab><c2c>\n"
+serialized: Some("<a> <bab> <c2c>\n")
+html_equal: Some(false)
+before: ...ldren: [Paragraph { children: [Html { value: "<a>", position: None }, Html { value: "<bab>", position: None }, Html { value: "<c2c>", position: None }], position: None }]
+after:  ...ldren: [Paragraph { children: [Html { value: "<a>", position: None }, Text { value: " ", position: None }, Html { value: "<bab>", position: None }, Text { value: " ", pos
+
+=== A | mismatch | example 614 (Raw HTML)
+input: "<a/><b2/>\n"
+serialized: Some("<a/> <b2/>\n")
+html_equal: Some(false)
+before: ...dren: [Paragraph { children: [Html { value: "<a/>", position: None }, Html { value: "<b2/>", position: None }], position: None }], position: None }
+after:  ...dren: [Paragraph { children: [Html { value: "<a/>", position: None }, Text { value: " ", position: None }, Html { value: "<b2/>", position: None }], position: None }], po
+
+=== A | mismatch | example 615 (Raw HTML)
+input: "<a  /><b2\ndata=\"foo\" >\n"
+serialized: Some("<a  /> <b2\ndata=\"foo\" >\n")
+html_equal: Some(false)
+before: ...en: [Paragraph { children: [Html { value: "<a  />", position: None }, Html { value: "<b2\ndata=\"foo\" >", position: None }], position: None }], position: None }
+after:  ...en: [Paragraph { children: [Html { value: "<a  />", position: None }, Text { value: " ", position: None }, Html { value: "<b2\ndata=\"foo\" >", position: None }], positio
+
+=== A | mismatch | example 617 (Raw HTML)
+input: "Foo <responsive-image src=\"foo.jpg\" />\n"
+serialized: Some("Foo  <responsive-image src=\"foo.jpg\" />\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "Foo ", position: None }, Html { value: "<responsive-image src=\"foo.jpg\" />", position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "Foo  ", position: None }, Html { value: "<responsive-image src=\"foo.jpg\" />", position: None }], position: None 
+
+=== A | mismatch | example 623 (Raw HTML)
+input: "</a></foo >\n"
+serialized: Some("</a> </foo >\n")
+html_equal: Some(false)
+before: ...dren: [Paragraph { children: [Html { value: "</a>", position: None }, Html { value: "</foo >", position: None }], position: None }], position: None }
+after:  ...dren: [Paragraph { children: [Html { value: "</a>", position: None }, Text { value: " ", position: None }, Html { value: "</foo >", position: None }], position: None }], 
+
+=== A | mismatch | example 625 (Raw HTML)
+input: "foo <!-- this is a --\ncomment - with hyphens -->\n"
+serialized: Some("foo  <!-- this is a --\ncomment - with hyphens -->\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "foo ", position: None }, Html { value: "<!-- this is a --\ncomment - with hyphens -->", position: None }], positio
+after:  ...Root { children: [Paragraph { children: [Text { value: "foo  ", position: None }, Html { value: "<!-- this is a --\ncomment - with hyphens -->", position: None }], positi
+
+=== A | mismatch | example 626 (Raw HTML)
+input: "foo <!--> foo -->\n\nfoo <!---> foo -->\n"
+serialized: Some("foo  <!--> foo -->\n\nfoo  <!---> foo -->\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "foo ", position: None }, Html { value: "<!-->", position: None }, Text { value: " foo -->", position: None }], pos
+after:  ...Root { children: [Paragraph { children: [Text { value: "foo  ", position: None }, Html { value: "<!-->", position: None }, Text { value: " foo -->", position: None }], po
+
+=== A | mismatch | example 627 (Raw HTML)
+input: "foo <?php echo $a; ?>\n"
+serialized: Some("foo  <?php echo $a; ?>\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "foo ", position: None }, Html { value: "<?php echo $a; ?>", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "foo  ", position: None }, Html { value: "<?php echo $a; ?>", position: None }], position: None }], position: None 
+
+=== A | mismatch | example 628 (Raw HTML)
+input: "foo <!ELEMENT br EMPTY>\n"
+serialized: Some("foo  <!ELEMENT br EMPTY>\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "foo ", position: None }, Html { value: "<!ELEMENT br EMPTY>", position: None }], position: None }], position: None
+after:  ...Root { children: [Paragraph { children: [Text { value: "foo  ", position: None }, Html { value: "<!ELEMENT br EMPTY>", position: None }], position: None }], position: Non
+
+=== A | mismatch | example 629 (Raw HTML)
+input: "foo <![CDATA[>&<]]>\n"
+serialized: Some("foo  <![CDATA[>&<]]>\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "foo ", position: None }, Html { value: "<![CDATA[>&<]]>", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "foo  ", position: None }, Html { value: "<![CDATA[>&<]]>", position: None }], position: None }], position: None }
+
+=== A | mismatch | example 630 (Raw HTML)
+input: "foo <a href=\"&ouml;\">\n"
+serialized: Some("foo  <a href=\"&ouml;\">\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "foo ", position: None }, Html { value: "<a href=\"&ouml;\">", position: None }], position: None }], position: None
+after:  ...Root { children: [Paragraph { children: [Text { value: "foo  ", position: None }, Html { value: "<a href=\"&ouml;\">", position: None }], position: None }], position: Non
+
+=== A | mismatch | example 631 (Raw HTML)
+input: "foo <a href=\"\\*\">\n"
+serialized: Some("foo  <a href=\"\\*\">\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "foo ", position: None }, Html { value: "<a href=\"\\*\">", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "foo  ", position: None }, Html { value: "<a href=\"\\*\">", position: None }], position: None }], position: None }
+
+=== B | mismatch | example 20 (Backslash escapes)
+input: "<https://example.com?find=\\*>\n"
+serialized: Some("<https://example.com?find=\\\\*>\n")
+html_equal: Some(false)
+before: ...hildren: [Link { children: [Text { value: "https://example.com?find=\\*", position: None }], position: None, url: "https://example.com?find=\\*", title: None }], position
+after:  ...hildren: [Link { children: [Text { value: "https://example.com?find=\\\\*", position: None }], position: None, url: "https://example.com?find=\\\\*", title: None }], posi
+
+=== B | mismatch | example 39 (Entity and numeric character references)
+input: "foo&#10;&#10;bar\n"
+serialized: Some("foo\n\nbar\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "foo\n\nbar", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "foo", position: None }], position: None }, Paragraph { children: [Text { value: "bar", position: None }], position
+
+=== B | mismatch | example 148 (HTML blocks)
+input: "<table><tr><td>\n<pre>\n**Hello**,\n\n_world_.\n</pre>\n</td></tr></table>\n"
+serialized: Some("<table><tr><td>\n<pre>\n**Hello**,\n\n*world*. </pre>\n\n</td></tr></table>\n")
+html_equal: Some(false)
+before: ... value: "world", position: None }], position: None }, Text { value: ".\n", position: None }, Html { value: "</pre>", position: None }], position: None }, Html { value: "<
+after:  ... value: "world", position: None }], position: None }, Text { value: ". ", position: None }, Html { value: "</pre>", position: None }], position: None }, Html { value: "</
+
+=== B | mismatch | example 168 (HTML blocks)
+input: "<del>*foo*</del>\n"
+serialized: Some("<del>*foo* </del>\n")
+html_equal: Some(false)
+before: ... children: [Text { value: "foo", position: None }], position: None }, Html { value: "</del>", position: None }], position: None }], position: None }
+after:  ... children: [Text { value: "foo", position: None }], position: None }, Text { value: " ", position: None }, Html { value: "</del>", position: None }], position: None }], p
+
+=== B | mismatch | example 187 (HTML blocks)
+input: "Foo\n<a href=\"bar\">\nbaz\n"
+serialized: Some("Foo <a href=\"bar\">\nbaz\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "Foo\n", position: None }, Html { value: "<a href=\"bar\">", position: None }, Text { value: "\nbaz", position: Non
+after:  ...Root { children: [Paragraph { children: [Text { value: "Foo ", position: None }, Html { value: "<a href=\"bar\">", position: None }, Text { value: "\nbaz", position: None
+
+=== B | mismatch | example 194 (Link reference definitions)
+input: "[Foo*bar\\]]:my_(url) 'title (with parens)'\n\n[Foo*bar\\]]\n"
+serialized: Some("[Foo*bar\\]]: my_\\(url\\) \"title (with parens)\"\n\n[Foo\\*bar\\]][Foo*bar\\]]\n")
+html_equal: Some(true)
+before: ...value: "Foo*bar]", position: None }], position: None, reference_kind: Shortcut, identifier: "foo*bar\\]", label: Some("Foo*bar]") }], position: None }], position: None }
+after:  ...value: "Foo*bar]", position: None }], position: None, reference_kind: Full, identifier: "foo*bar\\]", label: Some("Foo*bar]") }], position: None }], position: None }
+
+=== B | mismatch | example 201 (Link reference definitions)
+input: "[foo]: <bar>(baz)\n\n[foo]\n"
+serialized: Some("\\[foo]:  <bar>(baz)\n\n\\[foo]\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "[foo]: ", position: None }, Html { value: "<bar>", position: None }, Text { value: "(baz)", position: None }], pos
+after:  ...Root { children: [Paragraph { children: [Text { value: "[foo]:  ", position: None }, Html { value: "<bar>", position: None }, Text { value: "(baz)", position: None }], po
+
+=== B | mismatch | example 306 (Lists)
+input: "- foo\n\n- bar\n\n\n- baz\n"
+serialized: Some("* foo\n\n* bar\n\n* baz\n")
+html_equal: Some(true)
+before: ... "bar", position: None }], position: None }], position: None, spread: true, checked: None }, ListItem { children: [Paragraph { children: [Text { value: "baz", position: N
+after:  ... "bar", position: None }], position: None }], position: None, spread: false, checked: None }, ListItem { children: [Paragraph { children: [Text { value: "baz", position: 
+
+=== B | mismatch | example 354 (Emphasis and strong emphasis)
+input: "*$*alpha.\n\n*£*bravo.\n\n*€*charlie.\n"
+serialized: Some("\\*\\$\\*alpha.\n\n\\*£&#x62;bravo.\n\n\\*€&#x68;charlie.\n")
+html_equal: Some(false)
+before: ...: None }], position: None }, Paragraph { children: [Text { value: "*£*bravo.", position: None }], position: None }, Paragraph { children: [Text { value: "*€*charlie.", po
+after:  ...: None }], position: None }, Paragraph { children: [Text { value: "*£bbravo.", position: None }], position: None }, Paragraph { children: [Text { value: "*€hcharlie.", po
+
+=== B | panic | example 362 (Emphasis and strong emphasis)
+input: "пристаням_стремятся_\n"
+serialized: None
+html_equal: None
+panicked at /home/vscode/.cargo/git/checkouts/markdown-rs-64faae44d2705efa/1506572/mdast_util_to_markdown/src/state.rs:509:59:
+start byte index 21 is not a char boundary; it is inside 'с' (bytes 20..22 of string)
+
+=== B | mismatch | example 375 (Emphasis and strong emphasis)
+input: "_пристаням_стремятся\n"
+serialized: Some("\\_пристаням&#x44F;стремятся\n")
+html_equal: Some(false)
+before: ...{ children: [Paragraph { children: [Text { value: "_пристаням_стремятся", position: None }], position: None }], position: None }
+after:  ...{ children: [Paragraph { children: [Text { value: "_пристанямястремятся", position: None }], position: None }], position: None }
+
+=== B | mismatch | example 388 (Emphasis and strong emphasis)
+input: "пристаням__стремятся__\n"
+serialized: Some("пристаням&#x441;стремятся__\n")
+html_equal: Some(false)
+before: ... { children: [Paragraph { children: [Text { value: "пристаням__стремятся__", position: None }], position: None }], position: None }
+after:  ... { children: [Paragraph { children: [Text { value: "пристанямсстремятся__", position: None }], position: None }], position: None }
+
+=== B | mismatch | example 401 (Emphasis and strong emphasis)
+input: "__пристаням__стремятся\n"
+serialized: Some("\\_\\_пристаням&#x441;стремятся\n")
+html_equal: Some(false)
+before: ... children: [Paragraph { children: [Text { value: "__пристаням__стремятся", position: None }], position: None }], position: None }
+after:  ... children: [Paragraph { children: [Text { value: "__пристанямсстремятся", position: None }], position: None }], position: None }
+
+=== B | mismatch | example 461 (Emphasis and strong emphasis)
+input: "*_foo_*\n"
+serialized: Some("**foo**\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Emphasis { children: [Emphasis { children: [Text { value: "foo", position: None }], position: None }], position: None }], positio
+after:  ...Root { children: [Paragraph { children: [Strong { children: [Text { value: "foo", position: None }], position: None }], position: None }], position: None }
+
+=== B | mismatch | example 463 (Emphasis and strong emphasis)
+input: "_*foo*_\n"
+serialized: Some("**foo**\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Emphasis { children: [Emphasis { children: [Text { value: "foo", position: None }], position: None }], position: None }], positio
+after:  ...Root { children: [Paragraph { children: [Strong { children: [Text { value: "foo", position: None }], position: None }], position: None }], position: None }
+
+=== B | mismatch | example 475 (Emphasis and strong emphasis)
+input: "*<img src=\"foo\" title=\"*\"/>\n"
+serialized: Some("\\* <img src=\"foo\" title=\"*\"/>\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "*", position: None }, Html { value: "<img src=\"foo\" title=\"*\"/>", position: None }], position: None }], positi
+after:  ...Root { children: [Paragraph { children: [Text { value: "* ", position: None }, Html { value: "<img src=\"foo\" title=\"*\"/>", position: None }], position: None }], posit
+
+=== B | mismatch | example 476 (Emphasis and strong emphasis)
+input: "**<a href=\"**\">\n"
+serialized: Some("\\*\\* <a href=\"**\">\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "**", position: None }, Html { value: "<a href=\"**\">", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "** ", position: None }, Html { value: "<a href=\"**\">", position: None }], position: None }], position: None }
+
+=== B | mismatch | example 477 (Emphasis and strong emphasis)
+input: "__<a href=\"__\">\n"
+serialized: Some("\\_\\_ <a href=\"__\">\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "__", position: None }, Html { value: "<a href=\"__\">", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "__ ", position: None }, Html { value: "<a href=\"__\">", position: None }], position: None }], position: None }
+
+=== B | mismatch | example 491 (Links)
+input: "[link](<foo\nbar>)\n"
+serialized: Some("\\[link]\\( <foo\nbar>)\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "[link](", position: None }, Html { value: "<foo\nbar>", position: None }, Text { value: ")", position: None }], po
+after:  ...Root { children: [Paragraph { children: [Text { value: "[link]( ", position: None }, Html { value: "<foo\nbar>", position: None }, Text { value: ")", position: None }], p
+
+=== B | mismatch | example 494 (Links)
+input: "[a](<b)c\n[a](<b)c>\n[a](<b>c)\n"
+serialized: Some("\\[a]\\(\\<b)c\n\\[a]\\(\\<b)c>\n\\[a]\\( <b>c)\n")
+html_equal: Some(false)
+before: ...dren: [Paragraph { children: [Text { value: "[a](<b)c\n[a](<b)c>\n[a](", position: None }, Html { value: "<b>", position: None }, Text { value: "c)", position: None }], p
+after:  ...dren: [Paragraph { children: [Text { value: "[a](<b)c\n[a](<b)c>\n[a]( ", position: None }, Html { value: "<b>", position: None }, Text { value: "c)", position: None }], 
+
+=== B | mismatch | example 524 (Links)
+input: "[foo <bar attr=\"](baz)\">\n"
+serialized: Some("\\[foo  <bar attr=\"](baz)\">\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "[foo ", position: None }, Html { value: "<bar attr=\"](baz)\">", position: None }], position: None }], position: N
+after:  ...Root { children: [Paragraph { children: [Text { value: "[foo  ", position: None }, Html { value: "<bar attr=\"](baz)\">", position: None }], position: None }], position: 
+
+=== B | mismatch | example 536 (Links)
+input: "[foo <bar attr=\"][ref]\">\n\n[ref]: /uri\n"
+serialized: Some("\\[foo  <bar attr=\"][ref]\">\n\n[ref]: /uri\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "[foo ", position: None }, Html { value: "<bar attr=\"][ref]\">", position: None }], position: None }, Definition {
+after:  ...Root { children: [Paragraph { children: [Text { value: "[foo  ", position: None }, Html { value: "<bar attr=\"][ref]\">", position: None }], position: None }, Definition 
+
+=== B | mismatch | example 554 (Links)
+input: "[*foo* bar][]\n\n[*foo* bar]: /url \"title\"\n"
+serialized: Some("[*foo* bar][foo bar]\n\n[*foo* bar]: /url \"title\"\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [LinkReference { children: [Emphasis { children: [Text { value: "foo", position: None }], position: None }, Text { value: " bar", 
+after:  ...Root { children: [Paragraph { children: [Text { value: "[", position: None }, Emphasis { children: [Text { value: "foo", position: None }], position: None }, Text { value
+
+=== B | mismatch | example 558 (Links)
+input: "[*foo* bar]\n\n[*foo* bar]: /url \"title\"\n"
+serialized: Some("[*foo* bar][foo bar]\n\n[*foo* bar]: /url \"title\"\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [LinkReference { children: [Emphasis { children: [Text { value: "foo", position: None }], position: None }, Text { value: " bar", 
+after:  ...Root { children: [Paragraph { children: [Text { value: "[", position: None }, Emphasis { children: [Text { value: "foo", position: None }], position: None }, Text { value
+
+=== B | mismatch | example 559 (Links)
+input: "[[*foo* bar]]\n\n[*foo* bar]: /url \"title\"\n"
+serialized: Some("\\[[*foo* bar][foo bar]]\n\n[*foo* bar]: /url \"title\"\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "[", position: None }, LinkReference { children: [Emphasis { children: [Text { value: "foo", position: None }], pos
+after:  ...Root { children: [Paragraph { children: [Text { value: "[[", position: None }, Emphasis { children: [Text { value: "foo", position: None }], position: None }, Text { valu
+
+=== B | mismatch | example 564 (Links)
+input: "[foo*]: /url\n\n*[foo*]\n"
+serialized: Some("[foo*]: /url\n\n\\*[foo\\*][foo*]\n")
+html_equal: Some(true)
+before: ...t { value: "foo*", position: None }], position: None, reference_kind: Shortcut, identifier: "foo*", label: Some("foo*") }], position: None }], position: None }
+after:  ...t { value: "foo*", position: None }], position: None, reference_kind: Full, identifier: "foo*", label: Some("foo*") }], position: None }], position: None }
+
+=== B | mismatch | example 573 (Images)
+input: "![foo *bar*]\n\n[foo *bar*]: train.jpg \"train & tracks\"\n"
+serialized: Some("![foo bar]\n\n[foo *bar*]: train.jpg \"train & tracks\"\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [ImageReference { position: None, alt: "foo bar", reference_kind: Shortcut, identifier: "foo*bar*", label: Some("foo bar") }], pos
+after:  ...Root { children: [Paragraph { children: [Text { value: "![foo bar]", position: None }], position: None }, Definition { position: None, url: "train.jpg", title: Some("trai
+
+=== B | mismatch | example 576 (Images)
+input: "![foo *bar*][]\n\n[foo *bar*]: train.jpg \"train & tracks\"\n"
+serialized: Some("![foo bar][]\n\n[foo *bar*]: train.jpg \"train & tracks\"\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [ImageReference { position: None, alt: "foo bar", reference_kind: Collapsed, identifier: "foo*bar*", label: Some("foo bar") }], po
+after:  ...Root { children: [Paragraph { children: [Text { value: "![foo bar][]", position: None }], position: None }, Definition { position: None, url: "train.jpg", title: Some("tr
+
+=== B | mismatch | example 585 (Images)
+input: "![*foo* bar][]\n\n[*foo* bar]: /url \"title\"\n"
+serialized: Some("![foo bar][]\n\n[*foo* bar]: /url \"title\"\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [ImageReference { position: None, alt: "foo bar", reference_kind: Collapsed, identifier: "*foo*bar", label: Some("foo bar") }], po
+after:  ...Root { children: [Paragraph { children: [Text { value: "![foo bar][]", position: None }], position: None }, Definition { position: None, url: "/url", title: Some("title")
+
+=== B | mismatch | example 589 (Images)
+input: "![*foo* bar]\n\n[*foo* bar]: /url \"title\"\n"
+serialized: Some("![foo bar]\n\n[*foo* bar]: /url \"title\"\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [ImageReference { position: None, alt: "foo bar", reference_kind: Shortcut, identifier: "*foo*bar", label: Some("foo bar") }], pos
+after:  ...Root { children: [Paragraph { children: [Text { value: "![foo bar]", position: None }], position: None }, Definition { position: None, url: "/url", title: Some("title"), 
+
+=== B | mismatch | example 603 (Autolinks)
+input: "<https://example.com/\\[\\>\n"
+serialized: Some("<https://example.com/\\\\[\\\\>\n")
+html_equal: Some(false)
+before: ...h { children: [Link { children: [Text { value: "https://example.com/\\[\\", position: None }], position: None, url: "https://example.com/\\[\\", title: None }], position:
+after:  ...h { children: [Link { children: [Text { value: "https://example.com/\\\\[\\\\", position: None }], position: None, url: "https://example.com/\\\\[\\\\", title: None }], p
+
+=== B | mismatch | example 606 (Autolinks)
+input: "<foo\\+@bar.example.com>\n"
+serialized: Some("\\<foo+@bar.example.com>\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "<foo+@bar.example.com>", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "<", position: None }, Link { children: [Text { value: "foo+@bar.example.com", position: None }], position: None, u
+
+=== B | mismatch | example 613 (Raw HTML)
+input: "<a><bab><c2c>\n"
+serialized: Some("<a> <bab> <c2c>\n")
+html_equal: Some(false)
+before: ...ldren: [Paragraph { children: [Html { value: "<a>", position: None }, Html { value: "<bab>", position: None }, Html { value: "<c2c>", position: None }], position: None }]
+after:  ...ldren: [Paragraph { children: [Html { value: "<a>", position: None }, Text { value: " ", position: None }, Html { value: "<bab>", position: None }, Text { value: " ", pos
+
+=== B | mismatch | example 614 (Raw HTML)
+input: "<a/><b2/>\n"
+serialized: Some("<a/> <b2/>\n")
+html_equal: Some(false)
+before: ...dren: [Paragraph { children: [Html { value: "<a/>", position: None }, Html { value: "<b2/>", position: None }], position: None }], position: None }
+after:  ...dren: [Paragraph { children: [Html { value: "<a/>", position: None }, Text { value: " ", position: None }, Html { value: "<b2/>", position: None }], position: None }], po
+
+=== B | mismatch | example 615 (Raw HTML)
+input: "<a  /><b2\ndata=\"foo\" >\n"
+serialized: Some("<a  /> <b2\ndata=\"foo\" >\n")
+html_equal: Some(false)
+before: ...en: [Paragraph { children: [Html { value: "<a  />", position: None }, Html { value: "<b2\ndata=\"foo\" >", position: None }], position: None }], position: None }
+after:  ...en: [Paragraph { children: [Html { value: "<a  />", position: None }, Text { value: " ", position: None }, Html { value: "<b2\ndata=\"foo\" >", position: None }], positio
+
+=== B | mismatch | example 617 (Raw HTML)
+input: "Foo <responsive-image src=\"foo.jpg\" />\n"
+serialized: Some("Foo  <responsive-image src=\"foo.jpg\" />\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "Foo ", position: None }, Html { value: "<responsive-image src=\"foo.jpg\" />", position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "Foo  ", position: None }, Html { value: "<responsive-image src=\"foo.jpg\" />", position: None }], position: None 
+
+=== B | mismatch | example 623 (Raw HTML)
+input: "</a></foo >\n"
+serialized: Some("</a> </foo >\n")
+html_equal: Some(false)
+before: ...dren: [Paragraph { children: [Html { value: "</a>", position: None }, Html { value: "</foo >", position: None }], position: None }], position: None }
+after:  ...dren: [Paragraph { children: [Html { value: "</a>", position: None }, Text { value: " ", position: None }, Html { value: "</foo >", position: None }], position: None }], 
+
+=== B | mismatch | example 625 (Raw HTML)
+input: "foo <!-- this is a --\ncomment - with hyphens -->\n"
+serialized: Some("foo  <!-- this is a --\ncomment - with hyphens -->\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "foo ", position: None }, Html { value: "<!-- this is a --\ncomment - with hyphens -->", position: None }], positio
+after:  ...Root { children: [Paragraph { children: [Text { value: "foo  ", position: None }, Html { value: "<!-- this is a --\ncomment - with hyphens -->", position: None }], positi
+
+=== B | mismatch | example 626 (Raw HTML)
+input: "foo <!--> foo -->\n\nfoo <!---> foo -->\n"
+serialized: Some("foo  <!--> foo -->\n\nfoo  <!---> foo -->\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "foo ", position: None }, Html { value: "<!-->", position: None }, Text { value: " foo -->", position: None }], pos
+after:  ...Root { children: [Paragraph { children: [Text { value: "foo  ", position: None }, Html { value: "<!-->", position: None }, Text { value: " foo -->", position: None }], po
+
+=== B | mismatch | example 627 (Raw HTML)
+input: "foo <?php echo $a; ?>\n"
+serialized: Some("foo  <?php echo $a; ?>\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "foo ", position: None }, Html { value: "<?php echo $a; ?>", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "foo  ", position: None }, Html { value: "<?php echo $a; ?>", position: None }], position: None }], position: None 
+
+=== B | mismatch | example 628 (Raw HTML)
+input: "foo <!ELEMENT br EMPTY>\n"
+serialized: Some("foo  <!ELEMENT br EMPTY>\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "foo ", position: None }, Html { value: "<!ELEMENT br EMPTY>", position: None }], position: None }], position: None
+after:  ...Root { children: [Paragraph { children: [Text { value: "foo  ", position: None }, Html { value: "<!ELEMENT br EMPTY>", position: None }], position: None }], position: Non
+
+=== B | mismatch | example 629 (Raw HTML)
+input: "foo <![CDATA[>&<]]>\n"
+serialized: Some("foo  <![CDATA[>&<]]>\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "foo ", position: None }, Html { value: "<![CDATA[>&<]]>", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "foo  ", position: None }, Html { value: "<![CDATA[>&<]]>", position: None }], position: None }], position: None }
+
+=== B | mismatch | example 630 (Raw HTML)
+input: "foo <a href=\"&ouml;\">\n"
+serialized: Some("foo  <a href=\"&ouml;\">\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "foo ", position: None }, Html { value: "<a href=\"&ouml;\">", position: None }], position: None }], position: None
+after:  ...Root { children: [Paragraph { children: [Text { value: "foo  ", position: None }, Html { value: "<a href=\"&ouml;\">", position: None }], position: None }], position: Non
+
+=== B | mismatch | example 631 (Raw HTML)
+input: "foo <a href=\"\\*\">\n"
+serialized: Some("foo  <a href=\"\\*\">\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "foo ", position: None }, Html { value: "<a href=\"\\*\">", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "foo  ", position: None }, Html { value: "<a href=\"\\*\">", position: None }], position: None }], position: None }
+
+=== C | serialize_err | table cell with pipe
+input: "| a |\n|---|\n| b \\| c |\n"
+serialized: None
+html_equal: None
+Unexpected node type `Table { children: [TableRow { children: [TableCell { children: [Text { value: "a", position: None }], position: None }], position: None }, TableRow { children: [TableCell { child
+
+=== C | serialize_err | table cell with pipe in code
+input: "| a |\n|---|\n| `b \\| c` |\n"
+serialized: None
+html_equal: None
+Unexpected node type `Table { children: [TableRow { children: [TableCell { children: [Text { value: "a", position: None }], position: None }], position: None }, TableRow { children: [TableCell { child
+
+=== C | serialize_err | table with alignment
+input: "| a | b | c |\n|:--|:-:|--:|\n| 1 | 2 | 3 |\n"
+serialized: None
+html_equal: None
+Unexpected node type `Table { children: [TableRow { children: [TableCell { children: [Text { value: "a", position: None }], position: None }, TableCell { children: [Text { value: "b", position: None }
+
+=== C | serialize_err | footnote
+input: "a[^1]\n\n[^1]: note\n"
+serialized: None
+html_equal: None
+Unexpected node type `FootnoteReference { position: None, identifier: "1", label: Some("1") }`
+
+=== C | serialize_err | footnote with blocks
+input: "a[^n]\n\n[^n]: one\n\n    two\n\n    - three\n"
+serialized: None
+html_equal: None
+Unexpected node type `FootnoteReference { position: None, identifier: "n", label: Some("n") }`
+
+=== C | mismatch | task list
+input: "- [x] done\n- [ ] todo\n"
+serialized: Some("* done\n* todo\n")
+html_equal: Some(false)
+before: ...: None }], position: None }], position: None, spread: false, checked: Some(true) }, ListItem { children: [Paragraph { children: [Text { value: "todo", position: None }], 
+after:  ...: None }], position: None }], position: None, spread: false, checked: None }, ListItem { children: [Paragraph { children: [Text { value: "todo", position: None }], positi
+
+=== C | mismatch | task list nested
+input: "- [x] done\n  - [ ] sub\n"
+serialized: Some("* done\n  * sub\n")
+html_equal: Some(false)
+before: ...: None }], position: None }], position: None, spread: false, checked: Some(false) }], position: None, ordered: false, start: None, spread: false }], position: None, sprea
+after:  ...: None }], position: None }], position: None, spread: false, checked: None }], position: None, ordered: false, start: None, spread: false }], position: None, spread: fals
+
+=== C | serialize_err | strikethrough
+input: "a ~~b~~ c\n"
+serialized: None
+html_equal: None
+Unexpected node type `Delete { children: [Text { value: "b", position: None }], position: None }`
+
+=== C | serialize_err | strikethrough with emphasis
+input: "~~a *b* c~~\n"
+serialized: None
+html_equal: None
+Unexpected node type `Delete { children: [Text { value: "a ", position: None }, Emphasis { children: [Text { value: "b", position: None }], position: None }, Text { value: " c", position: None }], pos
+
+=== C | panic | long inline code, LF then break marker
+input: "`xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n[y`\n"
+serialized: None
+html_equal: None
+panicked at /home/vscode/.cargo/git/checkouts/markdown-rs-64faae44d2705efa/1506572/mdast_util_to_markdown/src/handle/inline_code.rs:54:34:
+byte range starts at 200 but ends at 2
+
+=== C | panic | long inline code, CRLF then break marker
+input: "`xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\n[y`\r\n"
+serialized: None
+html_equal: None
+panicked at /home/vscode/.cargo/git/checkouts/markdown-rs-64faae44d2705efa/1506572/mdast_util_to_markdown/src/handle/inline_code.rs:54:34:
+byte range starts at 201 but ends at 2
+
+=== C | mismatch | cjk beside literal asterisk
+input: "これは\\*です\\*です\n"
+serialized: Some("これは&#xA;です*です\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "これは*です*です", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "これは\nです*です", position: None }], position: None }], position: None }
+
+=== C | panic | cyrillic beside literal underscore
+input: "при_вет_\n"
+serialized: None
+html_equal: None
+panicked at /home/vscode/.cargo/git/checkouts/markdown-rs-64faae44d2705efa/1506572/mdast_util_to_markdown/src/state.rs:509:59:
+start byte index 9 is not a char boundary; it is inside 'в' (bytes 8..10 of string)
+
+=== C | mismatch | accented beside literal asterisk
+input: "é\\*x\\*é\n"
+serialized: Some("é&#x78;x&#xE9;é\n")
+html_equal: Some(false)
+before: ...Root { children: [Paragraph { children: [Text { value: "é*x*é", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "éxxéé", position: None }], position: None }], position: None }
+
+=== D | mismatch | escaped autolink
+input: "\\<https://a.b>\n"
+serialized: Some("<[https://a.b>](https://a.b>)\n")
+html_equal: None
+before: ...h { children: [Text { value: "<", position: None }, Link { children: [Text { value: "https://a.b>", position: None }], position: None, url: "https://a.b>", title: None }]
+after:  ...h { children: [Text { value: "<", position: None }, Link { children: [Link { children: [Text { value: "https://a.b>", position: None }], position: None, url: "https://a.b
+
+=== E | mismatch | paragraph: "https://a.b"
+input: "Root { children: [Paragraph { children: [Text { value: \"https://a.b\", position: None }], position: None }], position: None }"
+serialized: Some("https://a.b\n")
+html_equal: None
+before: ...Root { children: [Paragraph { children: [Text { value: "https://a.b", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Link { children: [Text { value: "https://a.b", position: None }], position: None, url: "https://a.b", title: None }], position: N
+
+=== E | mismatch | paragraph: "www.a.b"
+input: "Root { children: [Paragraph { children: [Text { value: \"www.a.b\", position: None }], position: None }], position: None }"
+serialized: Some("www.a.b\n")
+html_equal: None
+before: ...Root { children: [Paragraph { children: [Text { value: "www.a.b", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Link { children: [Text { value: "www.a.b", position: None }], position: None, url: "http://www.a.b", title: None }], position: No
+
+=== E | mismatch | paragraph: "a@b.c"
+input: "Root { children: [Paragraph { children: [Text { value: \"a@b.c\", position: None }], position: None }], position: None }"
+serialized: Some("a@b.c\n")
+html_equal: None
+before: ...Root { children: [Paragraph { children: [Text { value: "a@b.c", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Link { children: [Text { value: "a@b.c", position: None }], position: None, url: "mailto:a@b.c", title: None }], position: None }
+
+=== E | mismatch | paragraph: "a\n\nb"
+input: "Root { children: [Paragraph { children: [Text { value: \"a\\n\\nb\", position: None }], position: None }], position: None }"
+serialized: Some("a\n\nb\n")
+html_equal: None
+before: ...Root { children: [Paragraph { children: [Text { value: "a\n\nb", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "a", position: None }], position: None }, Paragraph { children: [Text { value: "b", position: None }], position: No
+
+=== E | mismatch | paragraph: "é*x*é"
+input: "Root { children: [Paragraph { children: [Text { value: \"é*x*é\", position: None }], position: None }], position: None }"
+serialized: Some("é&#x78;x&#xE9;é\n")
+html_equal: None
+before: ...Root { children: [Paragraph { children: [Text { value: "é*x*é", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "éxxéé", position: None }], position: None }], position: None }
+
+=== E | mismatch | paragraph: "日本語*x*"
+input: "Root { children: [Paragraph { children: [Text { value: \"日本語*x*\", position: None }], position: None }], position: None }"
+serialized: Some("日本語*x*\n")
+html_equal: None
+before: ...Root { children: [Paragraph { children: [Text { value: "日本語*x*", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "日本語", position: None }, Emphasis { children: [Text { value: "x", position: None }], position: None }], position: N
+
+=== E | mismatch | paragraph: "Ünï_cödé_"
+input: "Root { children: [Paragraph { children: [Text { value: \"Ünï_cödé_\", position: None }], position: None }], position: None }"
+serialized: Some("Ünï&#xF6;ödé_\n")
+html_equal: None
+before: ...Root { children: [Paragraph { children: [Text { value: "Ünï_cödé_", position: None }], position: None }], position: None }
+after:  ...Root { children: [Paragraph { children: [Text { value: "Ünïöödé_", position: None }], position: None }], position: None }
+
+=== E | mismatch | heading: "# x"
+input: "Root { children: [Heading { children: [Text { value: \"# x\", position: None }], position: None, depth: 2 }], position: None }"
+serialized: Some("## # x\n")
+html_equal: None
+before: ...Root { children: [Heading { children: [Text { value: "# x", position: None }], position: None, depth: 2 }], position: None }
+after:  ...Root { children: [Heading { children: [Text { value: "x", position: None }], position: None, depth: 2 }], position: None }
+
+=== E | panic | inline code value: long, LF then break marker
+input: "Root { children: [Paragraph { children: [InlineCode { value: \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\\n[y\", position: None }], position: None }], position: None }"
+serialized: None
+html_equal: None
+panicked at /home/vscode/.cargo/git/checkouts/markdown-rs-64faae44d2705efa/1506572/mdast_util_to_markdown/src/handle/inline_code.rs:54:34:
+byte range starts at 200 but ends at 2
+
+=== E | panic | inline code value: long, CRLF then break marker
+input: "Root { children: [Paragraph { children: [InlineCode { value: \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\\r\\n[y\", position: None }], position: None }], position: None }"
+serialized: None
+html_equal: None
+panicked at /home/vscode/.cargo/git/checkouts/markdown-rs-64faae44d2705efa/1506572/mdast_util_to_markdown/src/handle/inline_code.rs:54:34:
+byte range starts at 201 but ends at 2
+

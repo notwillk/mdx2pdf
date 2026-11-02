@@ -1,0 +1,4 @@
+# Crash dumps from the harnesses' deliberate abort and overflow controls. They hold
+# process memory, including the environment and any tokens in it. Never commit them.
+core
+core.[0-9]*

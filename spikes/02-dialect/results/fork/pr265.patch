@@ -1,0 +1,50 @@
+diff --git a/src/util/character_reference.rs b/src/util/character_reference.rs
+index 4b616a8..e28ec9e 100644
+--- a/src/util/character_reference.rs
++++ b/src/util/character_reference.rs
+@@ -193,7 +193,7 @@ pub fn parse(value: &str) -> String {
+             let value_end = value_start + value_index;
+ 
+             // Non empty and terminated.
+-            if value_index > 0 && bytes[value_end] == b';' {
++            if value_index > 0 && value_end < len && bytes[value_end] == b';' {
+                 if let Some(decoded) = decode(
+                     str::from_utf8(&bytes[value_start..value_end]).unwrap(),
+                     marker,
+diff --git a/tests/mdx_jsx_text.rs b/tests/mdx_jsx_text.rs
+index 976ecd1..e77ed2c 100644
+--- a/tests/mdx_jsx_text.rs
++++ b/tests/mdx_jsx_text.rs
+@@ -386,6 +386,32 @@ fn mdx_jsx_text_core() -> Result<(), message::Message> {
+         "should not support things that look like character references but aren’t"
+     );
+ 
++    assert_eq!(
++        to_mdast("<a b='&amp' />.", &mdx.parse)?,
++        Node::Root(Root {
++            children: vec![Node::Paragraph(Paragraph {
++                children: vec![
++                    Node::MdxJsxTextElement(MdxJsxTextElement {
++                        name: Some("a".into()),
++                        attributes: vec![AttributeContent::Property(MdxJsxAttribute {
++                            name: "b".into(),
++                            value: Some(AttributeValue::Literal("&amp".into())),
++                        })],
++                        children: vec![],
++                        position: Some(Position::new(1, 1, 0, 1, 15, 14))
++                    }),
++                    Node::Text(Text {
++                        value: ".".into(),
++                        position: Some(Position::new(1, 15, 14, 1, 16, 15))
++                    })
++                ],
++                position: Some(Position::new(1, 1, 0, 1, 16, 15))
++            })],
++            position: Some(Position::new(1, 1, 0, 1, 16, 15))
++        }),
++        "should not support an unterminated character reference at the end of an attribute value"
++    );
++
+     assert_eq!(
+         to_mdast("<a\u{3000}b \u{3000}c\u{3000} d\u{3000}/>.", &mdx.parse)?,
+         Node::Root(Root {

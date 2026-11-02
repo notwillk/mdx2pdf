@@ -1,0 +1,14 @@
+label: pr184
+args: []
+
+suite A: 609/652 equal (93.40%) {"equal": 609, "mismatch": 42, "panic": 1}
+suite B: 608/652 equal (93.25%) {"equal": 608, "mismatch": 43, "panic": 1}
+suite C: 35/47 equal (74.47%) {"equal": 35, "mismatch": 5, "panic": 3, "serialize_err": 4}
+    1 x Unexpected node type `Delete { children: [Text { value: "a ", position: None }, Emphasis { children: [Text { value: "b", position: None }], position: None }, Text { value: " c", position: None }], pos
+    1 x Unexpected node type `Delete { children: [Text { value: "b", position: None }], position: None }`
+    1 x Unexpected node type `FootnoteReference { position: None, identifier: "1", label: Some
+    1 x Unexpected node type `FootnoteReference { position: None, identifier: "n", label: Some
+suite D: 14/15 equal (93.33%) {"equal": 14, "mismatch": 1}
+suite E: 49/59 equal (83.05%) {"equal": 49, "mismatch": 8, "panic": 2}
+
+dialect parses: 624/699 node kinds: {"Blockquote": 62, "Break": 11, "Code": 44, "Definition": 83, "Delete": 2, "Emphasis": 105, "FootnoteDefinition": 2, "FootnoteReference": 2, "Heading": 70, "Image": 11, "ImageReference": 12, "InlineCode": 40, "Link": 54, "LinkReference": 59, "List": 116, "ListItem": 170, "MdxJsxFlowElement": 38, "MdxJsxTextElement": 7, "MdxTextExpression": 3, "Paragraph": 718, "Root": 624, "Strong": 66, "Table": 3, "TableCell": 10, "TableRow": 6, "Text": 938, "ThematicBreak": 32}

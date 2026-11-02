@@ -1,0 +1,91 @@
+diff --git a/src/to_mdast.rs b/src/to_mdast.rs
+index 059287c..6364c40 100644
+--- a/src/to_mdast.rs
++++ b/src/to_mdast.rs
+@@ -1271,7 +1271,14 @@ fn on_exit_heading_setext_underline_sequence(context: &mut CompileContext) {
+     let head = context.bytes[position.start.index];
+     let depth = if head == b'-' { 2 } else { 1 };
+ 
+-    if let Node::Heading(node) = context.tail_mut() {
++    // The underline comes after heading content, so unclosed JSX (or other)
++    // nodes can still be the tail. Walk up to the heading.
++    let path_len = {
++        let (tree, stack, _) = context.trees.last().expect("Cannot get tail w/o tree");
++        heading_path_len(tree, stack).unwrap_or_else(|| unreachable!("expected heading on stack"))
++    };
++    let (tree, stack, _) = context.trees.last_mut().expect("Cannot get tail w/o tree");
++    if let Node::Heading(node) = delve_mut(tree, &stack[..path_len]) {
+         node.depth = depth;
+     } else {
+         unreachable!("expected heading on stack");
+@@ -1725,6 +1732,24 @@ fn delve_mut<'tree>(mut node: &'tree mut Node, stack: &'tree [usize]) -> &'tree
+     node
+ }
+ 
++/// Path length to the nearest heading ancestor (inclusive).
++fn heading_path_len(mut node: &Node, stack: &[usize]) -> Option<usize> {
++    let mut last = if let Node::Heading(_) = node {
++        Some(0)
++    } else {
++        None
++    };
++    let mut index = 0;
++    while index < stack.len() {
++        node = node.children()?.get(stack[index])?;
++        index += 1;
++        if let Node::Heading(_) = node {
++            last = Some(index);
++        }
++    }
++    last
++}
++
+ /// Remove initial/final EOLs.
+ fn trim_eol(value: String, at_start: bool, at_end: bool) -> String {
+     let bytes = value.as_bytes();
+diff --git a/src/tokenizer.rs b/src/tokenizer.rs
+index b30098c..2d20b50 100644
+--- a/src/tokenizer.rs
++++ b/src/tokenizer.rs
+@@ -529,8 +529,8 @@ impl<'a> Tokenizer<'a> {
+         );
+ 
+         if VOID_EVENTS.iter().any(|d| d == &name) {
+-            debug_assert!(
+-                current == previous.name,
++            debug_assert_eq!(
++                current, previous.name,
+                 "expected event to be void, instead of including something"
+             );
+         }
+diff --git a/tests/heading_setext.rs b/tests/heading_setext.rs
+index 3130327..864953c 100644
+--- a/tests/heading_setext.rs
++++ b/tests/heading_setext.rs
+@@ -315,3 +315,26 @@ fn heading_setext() -> Result<(), message::Message> {
+ 
+     Ok(())
+ }
++
++#[test]
++fn heading_setext_mdx_unclosed_jsx() {
++    let mdx = ParseOptions::mdx();
++
++    assert_eq!(
++        to_mdast("Hi <>\n======", &mdx)
++            .err()
++            .unwrap()
++            .to_string(),
++        "2:7: Expected a closing tag for `<>` (1:4) before the end of `HeadingSetext` (markdown-rs:end-tag-mismatch)",
++        "should not panic on a setext heading with an unclosed JSX fragment (GH-139)"
++    );
++
++    assert_eq!(
++        to_mdast("Hi <a>\n======", &mdx)
++            .err()
++            .unwrap()
++            .to_string(),
++        "2:7: Expected a closing tag for `<a>` (1:4) before the end of `HeadingSetext` (markdown-rs:end-tag-mismatch)",
++        "should not panic on a setext heading with an unclosed JSX element (GH-139)"
++    );
++}

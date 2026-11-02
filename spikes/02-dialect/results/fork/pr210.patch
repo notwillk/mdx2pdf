@@ -1,0 +1,57 @@
+diff --git a/src/construct/heading_setext.rs b/src/construct/heading_setext.rs
+index e4f8e42..4617e33 100644
+--- a/src/construct/heading_setext.rs
++++ b/src/construct/heading_setext.rs
+@@ -76,7 +76,10 @@ use crate::resolve::Name as ResolveName;
+ use crate::state::{Name as StateName, State};
+ use crate::subtokenize::Subresult;
+ use crate::tokenizer::Tokenizer;
+-use crate::util::{constant::TAB_SIZE, skip};
++use crate::util::{
++    constant::{TAB_SIZE, THEMATIC_BREAK_MARKER_COUNT_MIN},
++    skip,
++};
+ use alloc::vec;
+ 
+ /// At start of heading (setext) underline.
+@@ -220,11 +223,28 @@ pub fn resolve(tokenizer: &mut Tokenizer) -> Option<Subresult> {
+             heading_exit.name = Name::HeadingSetext;
+             tokenizer.map.add(exit + 1, 0, vec![heading_exit]);
+         } else {
+-            // There’s a following paragraph, move this underline inside it.
+-            if exit + 3 < tokenizer.events.len()
++            let sequence = skip::to(
++                &tokenizer.events,
++                enter + 1,
++                &[Name::HeadingSetextUnderlineSequence],
++            );
++            let start = tokenizer.events[sequence].point.index;
++            let end = tokenizer.events[sequence + 1].point.index;
++
++            if tokenizer.parse_state.options.constructs.thematic_break
++                && tokenizer.parse_state.bytes[start] == b'-'
++                && end - start >= THEMATIC_BREAK_MARKER_COUNT_MIN
++            {
++                // Not an underline: three or more dashes form a thematic break.
++                tokenizer.events[enter].name = Name::ThematicBreak;
++                tokenizer.events[exit].name = Name::ThematicBreak;
++                tokenizer.events[sequence].name = Name::ThematicBreakSequence;
++                tokenizer.events[sequence + 1].name = Name::ThematicBreakSequence;
++            } else if exit + 3 < tokenizer.events.len()
+                 && tokenizer.events[exit + 1].name == Name::LineEnding
+                 && tokenizer.events[exit + 3].name == Name::Paragraph
+             {
++                // There’s a following paragraph, move this underline inside it.
+                 // Swap type, HeadingSetextUnderline:Enter -> Paragraph:Enter.
+                 tokenizer.events[enter].name = Name::Paragraph;
+                 // Swap type, LineEnding -> Data.
+@@ -241,7 +261,8 @@ pub fn resolve(tokenizer: &mut Tokenizer) -> Option<Subresult> {
+                 tokenizer.events[exit + 4].link.as_mut().unwrap().previous = Some(exit + 1);
+                 // Remove *including* HeadingSetextUnderline:Exit, until the line ending.
+                 tokenizer.map.add(enter + 1, exit - enter, vec![]);
+-                // Remove old Paragraph:Enter.
++                // Remove old Paragraph:Enter, renamed so later underlines skip it.
++                tokenizer.events[exit + 3].name = Name::Data;
+                 tokenizer.map.add(exit + 3, 1, vec![]);
+             } else {
+                 // Swap type.

@@ -1,0 +1,36 @@
+--- p2c-orig/src/render.rs	2026-11-02 20:04:19.462763847 +0000
++++ p2c-quote/src/render.rs	2026-11-02 20:05:06.442090103 +0000
+@@ -39,7 +39,7 @@
+     fn write_str(&mut self, text: &str) -> fmt::Result {
+         for part in text.split_inclusive('\n') {
+             if self.line_start {
+-                self.text.push_str(&self.prefix);
++                self.text.push_str(if part == "\n" { self.prefix.trim_end() } else { &self.prefix });
+             }
+             self.text.push_str(part);
+             for byte in part.bytes() {
+@@ -1006,12 +1006,12 @@
+                     Some(BlockQuoteKind::Important) => " > [!IMPORTANT]",
+                     Some(BlockQuoteKind::Warning) => " > [!WARNING]",
+                     Some(BlockQuoteKind::Caution) => " > [!CAUTION]",
+-                    None => " > ",
++                    None => "> ",
+                 };
+                 self.output
+                     .write_str(if at_item_start { first.trim_start() } else { first })?;
+-                frame.prefix = " > ".into();
+-                self.separator = usize::from(!at_item_start || kind.is_some());
++                frame.prefix = "> ".into();
++                self.separator = usize::from(kind.is_some());
+             }
+             Tag::CodeBlock(CodeBlockKind::Indented) => {
+                 if at_item_start {
+@@ -1362,7 +1362,7 @@
+                     .frames
+                     .iter()
+                     .any(|f| matches!(f.tag, Tag::Item))
+-                    .then(|| format!("{} >", self.output.prefix));
++                    .then(|| format!("{}>", self.output.prefix));
+             }
+             Tag::Item => {
+                 self.separator = self.separator.max(options.newlines_after_rest.max(1));
