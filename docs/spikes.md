@@ -1,10 +1,10 @@
 # Spikes
 
-Short experiments to test the riskiest assumptions in the [technical design](technical-design.md) before building on them. Status as of 2026-11-02: Spike 1 failed, and Spikes 2–5 haven't started.
+Short experiments to test the riskiest assumptions in the [technical design](technical-design.md) before building on them. Status as of 2026-11-02: Spike 1 failed, Spike 1b passed every bar except exact output and its recommendations were accepted, and Spikes 2–5 haven't started.
 
 ## Ground rules
 
-- **Throwaway code.** Each spike lives in `spikes/NN-name/` and gets deleted once its findings are recorded. Nothing graduates into the real crates without being rewritten.
+- **Throwaway code.** Each spike lives in `spikes/NN-name/` and gets deleted once its findings are recorded. The exception is `spikes/01-serializer/`, which stays until its test suites move into the real tests, because the findings link to it. Nothing graduates into the real crates without being rewritten.
 - **Timeboxed.** When time runs out, record what's known and decide whether more is worth it.
 - **Objective result.** Each spike has a pass condition set in advance. Change a bar only by writing down why.
 - **Findings go here.** A result that settles a hard-to-reverse decision also gets an [ADR](adr/), and the design gets updated.
@@ -15,13 +15,18 @@ Short experiments to test the riskiest assumptions in the [technical design](tec
 
 | # | Question | Timebox | If it fails |
 |---|---|---|---|
-| [1](#spike-1-markdown-serializer) | Can `mdast_util_to_markdown` round-trip reliably? | 0.5 day | Write our own serializer |
+| [1](#spike-1-markdown-serializer) | Can `mdast_util_to_markdown` round-trip reliably? | 0.5 day | **Failed.** Go to Spike 1b |
+| [1b](#spike-1b-event-based-serializer) | Can `pulldown-cmark-to-cmark` serialize our trees through a small adapter? | 0.5 day | Write our own serializer. **Not needed:** it passed every bar except exact output |
 | [2](#spike-2-dialect-parsing) | Does `markdown` parse the Dialect? | 0.5 day | Work around the gaps, or change parser |
 | [3](#spike-3-liquid-behavior) | Does `liquid` behave the way the design needs? | 1 day | Custom filters, weaker errors, or a fork |
 | [4](#spike-4-typst-embedding) | Can Typst embed cleanly and deterministically? | 1–2 days | Try Fulgur |
 | [5](#spike-5-end-to-end-expansion) | Does Expansion work end to end? | 1–2 days | Revisit the expansion design |
 
-Spikes 1–4 are independent and can run in parallel. Spike 5 needs 1–3. If running one at a time, start with Spike 1, because it's the cheapest way to test the biggest risk.
+Run the remaining spikes in this order:
+
+1. **Spike 2** comes next, because the serializer's adapter depends on the parser's tree types, and Spike 1b found inputs that panic the parser.
+2. **Spikes 3 and 4** can run in either order.
+3. **Spike 5** comes last, because it needs a working serializer and normalization.
 
 ## Spike 1: Markdown serializer
 
@@ -45,7 +50,7 @@ Spikes 1–4 are independent and can run in parallel. Spike 5 needs 1–3. If ru
 
 **If it fails:** Write our own serializer, covering only the node kinds we produce. The spike should end with an estimate of that work.
 
-**Findings (2026-11-02): failed.** Write our own serializer, which should take about 2–3 days. Harness and raw output are in `spikes/01-serializer/`, and `results/record/misses.txt` has every miss with its input and output.
+**Findings (2026-11-02): failed.** These findings propose writing our own serializer, in about 2–3 days. The [evaluation](#evaluation-of-spike-1) below tries an alternative first. Harness and raw output are in `spikes/01-serializer/`, and `results/record/misses.txt` has every miss with its input and output.
 
 | Bar | Result |
 |---|---|
@@ -121,13 +126,164 @@ Ignoring the 23 that can't reach Stage 5 still leaves 20 misses, over the limit 
 
 **Not tested:** the harness can't catch a stack overflow, and none occurred. It didn't fuzz inputs beyond these suites.
 
+### Evaluation of Spike 1
+
+A separate review (2026-11-02) checked these findings against the harness, the saved results, and the crate's source, without re-running the harness.
+
+**The failure is real.** Every count, all 43 spec misses, and both bugs check out. The verdict doesn't depend on the 99% bar, because R14 requires tables, footnotes, strikethrough, and task lists, and the crate fails all four. Rejecting a fork is sound too, since all the patches combined only reach 94.17%. Two results support the rest of the design:
+
+- The tree-based expansion design holds, because the `\<div>` and `    total` hazards it was chosen for both pass.
+- The `markdown` parser had no panics or parse errors in Spike 1's suites. That didn't hold up: [Spike 1b](#spike-1b-event-based-serializer)'s random documents found inputs that panic it.
+
+**"Write our own" was premature.** The spike left three things untested:
+
+1. **The production path.** Stage 3 parses the Dialect and Stage 6 parses GFM, but only 15 hand-picked cases took that path. The spec suites use one grammar on both sides. The headline 93.40% is the CommonMark run, and the GFM run is 93.25%.
+2. **Trees shaped like Expansion output.** Every hand-built case has a single text value in one container. None has adjacent nodes or content from more than one file.
+3. **Any alternative except a fork.** See [Spike 1b](#spike-1b-event-based-serializer).
+
+**What changed as a result**, all in the [technical design](technical-design.md#serialization):
+
+- Trees get normalized before serializing. Resolving references there also clears 9 of the 20 reachable spec misses (194, 554, 558, 559, 564, 573, 576, 585, 589), and takes Stage 5 from 24 node kinds to 21.
+- The round trip is checked on every run, not only in tests.
+- Literal autolinks are off.
+
+**One limit on these results:** the patches behind the three patched runs weren't saved, so those runs can't be reproduced. The verdict doesn't depend on them.
+
+## Spike 1b: Event-based serializer
+
+**Question:** Can `pulldown-cmark-to-cmark` serialize our trees, through a small adapter, without changing their meaning?
+
+**Why it matters:** Writing our own means owning roughly 600–900 lines of escaping and delimiter logic. An adapter from our tree to this crate's events would be about 150–250 lines. Both figures are judgment.
+
+Its [README](https://github.com/Byron/pulldown-cmark-to-cmark) claims that all 652 CommonMark examples keep the same events after a round trip, backed by a differential suite of 91,446 generated inputs. It also claims support for tables, footnotes, strikethrough, and task lists, and that it returns `Error::Unrepresentable` rather than silently changing some delimiter blocks. None of this has been run here.
+
+**Method:** Add the adapter to the existing harness in `spikes/01-serializer/`, with `gfm_autolink_literal` off and [normalization](technical-design.md#normalization) applied. Re-parse the output under both `markdown` and `pulldown-cmark`, and report each separately. Note that `code_block_token_count` defaults to 4, so set it to 3.
+
+**Inputs:**
+
+- The five existing suites.
+- All 624 spec inputs that parse in the Dialect, through the production path: Dialect, normalize, serialize, GFM.
+- Expansion-shaped trees: adjacent nodes, empty values, grafted blocks, and several files.
+- Randomized text values in every container.
+- The PRD's example, which must produce exactly the Markdown shown there.
+
+**Watch for:**
+
+- **Edited events.** Its guarantee is for parser-produced events, and its README says it doesn't check whether arbitrary edited events are representable. Expression values and text containing line breaks are the likeliest weak spots.
+- **Parser differences.** It targets `pulldown-cmark`, and we currently re-parse with `markdown`, so the cross-parser result is the real test.
+
+**Also find out:**
+
+- Which `pulldown-cmark` version does it pin, and how active is it?
+- If the output re-parses cleanly under `pulldown-cmark`, should Stage 6 move there? That would leave `markdown` only in Stage 3, the one job no other parser does, which matters because its repo has had no commits since April 2025. Decide before Spike 4, because it changes what the Typst emitter reads.
+
+**Pass:** Spike 1's bars (equal trees on all curated cases, at least 99% of spec examples, and no panics), the PRD example's exact output, and an explanation for every miss.
+
+**If it fails:** Write our own, as Spike 1's findings propose. Their 2–3 days covers the listed suites. With normalization excluded but these extra tests included, plan on 4–5 days, which is also judgment.
+
+**Findings (2026-11-02): passed every bar except exact output. Recommendation: adopt it.** The harness is `spikes/01-serializer/src/bin/events.rs`, and `results/record-1b/` has the raw output. Reproduce it with `cargo run --release --bin events -- record-1b`. Re-running Spike 1's binary also reproduced its record byte for byte.
+
+| Bar | Result |
+|---|---|
+| At least 99% of spec examples | **Pass.** 99.69%: 650 of 652, against 93.40% for `mdast_util_to_markdown` |
+| All curated cases equal | **Pass.** 47 of 47, against 33 of 47 |
+| No panics | **Pass** for the serializer, with none in any suite. The 29 panics all came from the `markdown` parser |
+| The PRD example's exact output | **Fail.** The tree matches, but the text doesn't |
+| An explanation for every miss | **Pass** |
+
+The two spec misses are example 173, which involves `Html` and can't reach Stage 5, and example 321, where only tight versus loose differs.
+
+**The new suites:**
+
+| Suite | Result |
+|---|---|
+| Production path: the 624 spec inputs that parse in the Dialect | 623 of 624 (99.84%). The miss is example 321 |
+| Dialect cases, hand-built trees | 15 of 15, 59 of 59 |
+| Expansion-shaped trees, through a small mock of `instantiate` | All 40 behaved as expected: 36 round-trip, Expansion rejects 3, and the round-trip check catches 1 |
+| Random values with no edge whitespace or line breaks | 220,000 of 220,000 (20,000 values in each of 11 containers) |
+| Random values with whitespace and line breaks, then trimmed | 97.44–99.69% per container |
+| Random documents, GFM | 49,104 of 50,000 (98.21%) |
+| Random documents, Dialect | 45,748 of 46,546 (98.29%) |
+
+**Random document misses:**
+
+| Miss | GFM | Dialect | Effect |
+|---|---|---|---|
+| Tight versus loose only | 747 | 659 | Spacing only, mostly lists of empty items |
+| Real mismatch | 102 | 96 | Caught by the round-trip check. In the GFM run: 63 consecutive hard breaks, 20 multi-line code spans in a setext heading, and 19 unusual combinations such as `- * ***` |
+| `Unrepresentable` | 26 | 22 | The crate returns an error |
+| Malformed tree | 6 | 7 | A `markdown` bug: a list directly inside a list. The adapter rejects it |
+| Parser panic | 15 | 14 | A `markdown` bug, described below |
+
+So every miss either changes only spacing or produces an error. **None reaches a PDF silently**, provided the round-trip check runs. The random value misses are the same kind: a literal `\` just before a line break (the crate writes `\&#10;`, which reads as literal text), and values with a non-breaking space at the edge of emphasis (`Unrepresentable`).
+
+**Exact output.** The crate hard-codes its block quote prefix, with no option to change it:
+
+```text
+ > 
+ > **ALPHA**
+ > 
+ > Review **Alpha** before Q3 Report ships.
+```
+
+This is valid Markdown with the same tree as the PRD's example, but it isn't the same text. `results/quote-patch/quote.patch` changes 5 lines of the crate, produces the PRD's exact text, and doesn't change the result of any suite. So the options are to relax PRD success criterion 1 to "the same document", ask upstream for an option, or carry that patch. **Decision:** relax the criterion. Asking upstream is still to do. A cosmetic difference in a file only `--emit-md` shows shouldn't decide between this and owning 600–900 lines.
+
+**The `markdown` parser panics on small inputs.** There were 29 panics in 96,546 random documents, at three locations. `results/record-1b/parser-panics.txt` has the reduced inputs, and `src/bin/reduce.rs` produced them.
+
+| Input | Options that panic |
+|---|---|
+| `` "1. ```\n- x\n" ``, `` "- ```\n1. x\n" ``, `"- ~~~\n1. x\n"` | Stock CommonMark and GFM |
+| ``"\\\n-\n=\n`\n-"`` | Stock CommonMark and GFM |
+| `"<>]\n-\n"` | Dialect |
+
+The first row matters most: **an unclosed fence at the end of a list item, followed by a different kind of list.** An unclosed fence is an ordinary typo, and closing it avoids the panic. A nearby shape, `` "# t\n  - ```<\n* x|\n" ``, returns a malformed tree without panicking. `pulldown-cmark` had no panics on 100,000 random documents or on any serialized output.
+
+**Should Stage 6 move to `pulldown-cmark`? Decision: yes ([ADR 0003](adr/0003-two-markdown-parsers.md)).** A Markdown Input then never touches `markdown`, and `markdown` would remain only in Stage 3, the one job nothing else does. Under `pulldown-cmark`, the production path scores 619 of 624 (99.20%), and all 5 misses are code spans containing line breaks, which the two parsers store differently. Random documents score 98.47% and 98.59%, slightly above `markdown`. The cost is two parsers instead of one, and the Typst emitter reads events rather than a tree. The one-parser argument was already weak, because the Dialect and Markdown grammars differ anyway.
+
+**Also found out:**
+
+- **Literal autolinks:** turning them on drops the GFM spec run to 97.70%, curated cases to 43 of 47, and random documents to 84.61%. That confirms keeping them off.
+- **Size:** the adapter is about 310 lines and normalization about 200, both with comments. The adapter came in above the 150–250 estimate.
+- **Maintenance:** 23.0.0 came out on 2026-09-29, after 22.0.3 and 22.0.2 the day before and 22.0.1 in August. It requires `pulldown-cmark` 0.13. It went from 21.1.0 to 23.0.0 in under a year, so upgrades may need work, and it should be pinned exactly.
+- **Two of my predictions were wrong.** The evaluation said `x<B />y`, where `B` expands to `*(a)*`, has no Markdown form. The crate spells it `&#120;*(a)*&#121;`, which round-trips exactly. Adjacent emphasis also works, as `*a*_a_`. Only the link inside a link really has no form.
+- **More normalization is needed:** see the [technical design](technical-design.md#normalization). The spike added rules for list looseness, hard breaks, block edges, short table rows, and trimming Expression values.
+- **A grafting bug the check caught:** two paragraphs placed in a tight list item merged into `onetwo`, which the round-trip check reported.
+
+**Worth reporting upstream** (not reported yet): for `markdown`, the panics above, and `spread` being set when two blank lines follow a list. For `pulldown-cmark-to-cmark`, a hard break at the start of a paragraph or two in a row (written as a blank line), a table cell ending in `\`, a `\` before an encoded line break, a multi-line code span in a heading, the `- * ***` case, and an option for the block quote prefix.
+
+**Not tested:** real Expansion, because the mock has no Liquid and only a minimal version of Props. Also stack depth on deep nesting, and performance.
+
+### After the decisions
+
+Both recommendations were accepted on 2026-11-02, so Spike 1b was measured again with the round-trip check comparing `pulldown-cmark` events, as the design now does. Reproduce it with `cargo run --release --bin events -- stage6 --stage6-events`. The output is in `results/stage6/`.
+
+| Suite | Equal under `pulldown-cmark` |
+|---|---|
+| Production path | **624 of 624** |
+| Curated, Dialect, and hand-built cases | 47 of 47, 15 of 15, 59 of 59 |
+| All spec examples | 648 of 652. All 4 misses involve `Html`, which can't reach Stage 5 |
+| Expansion-shaped trees | All 40 behaved as expected |
+| Random values with no edge whitespace or line breaks | 219,690 of 220,000. All 310 misses are a table cell ending in `\` |
+| Random documents, GFM and Dialect | 49,531 of 50,000 (99.06%), and 46,132 of 46,546 (99.11%) |
+
+The random GFM misses are 353 table cells (mostly ending in `\`), 63 consecutive hard breaks, 19 `Unrepresentable`, 15 parser panics, 13 unusual combinations, and 6 malformed trees. As before, each of these produces an error rather than a changed PDF.
+
+**A correction.** The first version of these findings, and the summary given at the time, said a dummy definition, `[cmark-loose-1]: <>`, appeared only on odd random documents. That was wrong, because the probe only tried one blank line. **A list followed by two blank lines triggers it**, and a tight list could also turn loose, which would change the PDF's spacing. The cause is `markdown` setting `spread` in that case. Working out tight or loose from source lines fixes it: the dummy definition now appears nowhere, including in random documents, and tight lists stay tight.
+
+**Two more fixes from this run:**
+
+- **Ordered lists:** by default the serializer numbers every item `1.`, so the design turns on `increment_ordered_list_bullets`.
+- **Code spans:** the adapter now applies CommonMark's rule for line breaks in a code span, because `markdown` leaves it undone.
+
+**Final size:** the adapter is about 340 lines and normalization about 250, both with comments. The `record-1b` run above was made before these changes and stays reproducible, because they're behind the `--stage6-events` flag.
+
 ## Spike 2: Dialect parsing
 
 **Question:** With JSX and expressions on and ESM off, does `markdown` give us the tree the design needs?
 
 **Why it matters:** The docs say each construct has its own flag, but don't say whether this combination works. And `Constructs::mdx()` also turns off autolinks, indented code, and HTML, which makes the Dialect differ from Markdown.
 
-**Method:** Build a custom `Constructs` with `mdx_jsx_flow`, `mdx_jsx_text`, `mdx_expression_flow`, `mdx_expression_text`, and the GFM constructs on, and `mdx_esm`, `html_flow`, `html_text`, `code_indented`, and `autolink` off. Print the tree for each input below.
+**Method:** Build a custom `Constructs` with `mdx_jsx_flow`, `mdx_jsx_text`, `mdx_expression_flow`, `mdx_expression_text`, and the GFM constructs on, and `mdx_esm`, `html_flow`, `html_text`, `code_indented`, `autolink`, and `gfm_autolink_literal` off. Print the tree for each input below.
 
 | Input | Looking for |
 |---|---|
@@ -141,11 +297,13 @@ Ignoring the 23 that can't reach Stage 5 still leaves 20 misses, over the limit 
 | `<br>`, `<div>`, `<!-- x -->`, `<https://a.b>` | Error message and location |
 | `import Chart from './Chart.mdx'` | Prints as text, so how do we detect it? Compare a line check against passing a rejecting `mdx_esm_parse` |
 | `` `<A />` ``, a fence containing `<A />` | Stays code |
-| Random and malformed input | Returns `Err`, never panics |
+| Random and malformed input, including `` "1. ```\n- x\n" `` | Returns `Err`, or panics in a way a guard can catch |
 
 **Also find out:** Is the crate's lack of commits since 2025-04-23 a practical problem? Check whether the open PRs include bugs we'd hit, and how hard a fork would be.
 
-**Pass:** Correct nesting, Expression text preserved, no panics, and a written list of how the Dialect differs from Markdown.
+**Pass:** Correct nesting, Expression text preserved, no panic that escapes a `catch_unwind` guard, and a written list of how the Dialect differs from Markdown.
+
+This bar was "no panics". It changed because Spike 1b already found inputs that panic this parser, and Stage 3 has no alternative parser. So the question is now whether a guard turns those panics into ordinary errors, and whether the malformed trees it can return are detectable.
 
 **If it fails:** Pre-process around small gaps, fork if a fix is needed, or write a small tag scanner of our own, as executable.md does.
 
@@ -188,7 +346,7 @@ Ignoring the 23 that can't reach Stage 5 still leaves 20 misses, over the limit 
 
 **Why it matters:** This confirms or replaces the Renderer. It's also where binary size and speed get measured.
 
-**Method:** A small binary with a `World` holding in-memory source, embedded fonts, a confined file root, and no packages or network. A walker over the `markdown` tree emits Typst source, which goes through `typst` and `typst-pdf`.
+**Method:** A small binary with a `World` holding in-memory source, embedded fonts, a confined file root, and no packages or network. A walker over `pulldown-cmark` events emits Typst source, which goes through `typst` and `typst-pdf`.
 
 **Fixtures:**
 
@@ -216,13 +374,13 @@ Ignoring the 23 that can't reach Stage 5 still leaves 20 misses, over the limit 
 
 **Why it matters:** The first four spikes test the parts. This one tests how they interact, which is where most of the [known hazards](technical-design.md#known-hazards) are.
 
-**Depends on:** Spikes 1–3. It stops at Intermediate Markdown, with no PDF needed.
+**Depends on:** Spikes 1b, 2, and 3, plus a working serializer and normalization. It stops at Intermediate Markdown, with no PDF needed.
 
 **Method:** The smallest version of the pseudocode, run against fixture Projects, with `insta` snapshots.
 
 **Fixtures:**
 
-- The PRD's example, which must produce exactly the Markdown shown there.
+- The PRD's example, which must produce the same document as the Markdown shown there.
 - Nested Components, with a Component passing children on to another.
 - `<Content />` inside a quote, a list item, and a table cell, and multi-paragraph children in each.
 - Children containing Expressions, which must use the caller's scope.
@@ -230,13 +388,15 @@ Ignoring the 23 that can't reach Stage 5 still leaves 20 misses, over the limit 
 - Loops that generate Components.
 - Tags alone on a line, and tags mid-sentence, including one that wrongly expands to several blocks.
 - Direct and indirect recursion.
+- Two Components defining the same reference label with different URLs, and a Component with a footnote used twice.
+- A tree with no Markdown form, which must give an error: `[<L />](/c)`, where `L` expands to a link.
 - Every remaining row of the known hazards table.
 
 **Pass:**
 
 - All fixtures match their expected output, or give the expected error.
 - No MDX nodes survive.
-- Re-parsing the output gives the same tree as Expansion produced.
+- Re-parsing the output gives the same `pulldown-cmark` events as the normalized tree.
 
 **If it fails:** Revisit the expansion design before starting the real crates. A `<Content />` in a table cell that can't work may just need a documented limit, but a failure in scope or container handling means rethinking the design.
 
@@ -247,4 +407,4 @@ Ignoring the 23 that can't reach Stage 5 still leaves 20 misses, over the limit 
 1. Record findings above, and update the [technical design](technical-design.md) and [PRD](prd.md).
 2. Write an ADR for the Renderer.
 3. Have a person set performance and size targets from the Spike 4 numbers.
-4. Delete `spikes/` and start [Milestone 1](technical-design.md#delivery).
+4. Delete `spikes/`, once Spike 1's suites have moved into the real tests, and start [Milestone 1](technical-design.md#delivery).

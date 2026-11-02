@@ -1,8 +1,8 @@
 # Technical design
 
-**Status:** Proposal, 2026-11-02. Requirements (R1–R24) are in the [PRD](prd.md), and terms are in the [glossary](../GLOSSARY.md).
+**Status:** Proposal, 2026-11-02. Requirements (R1–R25) are in the [PRD](prd.md), and terms are in the [glossary](../GLOSSARY.md).
 
-**Only Spike 1 has been run.** Other claims about how crates behave come from their documentation, and the [spikes](spikes.md) exist to test them. Choices marked *(Spike N)* could change once that spike reports.
+**Only Spikes 1 and 1b have been run.** Other claims about how crates behave come from their documentation, and the [spikes](spikes.md) exist to test them. Choices marked *(Spike N)* could change once that spike reports.
 
 ## Pipeline
 
@@ -27,11 +27,11 @@ flowchart TD
 |---|---|---|---|
 | 1 | Split frontmatter | File text → YAML values, body | Done on raw text, because Liquid needs the values before anything is parsed. Line endings are normalized to LF here |
 | 2 | Liquid Pass | Body + scope → text | Runs on text, so it can generate tags |
-| 3 | Parse Dialect | Text → tree | JSX and expressions on; ESM, HTML, and indented code off |
-| 4 | Expand | Tree → tree with no MDX nodes | Runs stages 1–3 again for each Component use |
-| 5 | Serialize | Tree → Markdown string | The string is the required intermediate |
-| 6 | Parse Markdown | String → tree | CommonMark and GFM grammar. A Markdown Input joins at this stage |
-| 7 | Emit Typst | Tree + Page Settings → Typst source | Internal only. Authors never see it |
+| 3 | Parse Dialect | Text → tree | With `markdown`, inside a panic guard. JSX and expressions on; ESM, HTML, indented code, and literal autolinks off |
+| 4 | Expand | Tree → normalized tree with no MDX nodes | Runs stages 1–3 again for each Component use. See [normalization](#normalization) |
+| 5 | Serialize | Tree → Markdown string | With `pulldown-cmark-to-cmark`. The string is the required intermediate. Re-parsed and [checked](#round-trip-check) on every run |
+| 6 | Parse Markdown | String → events | With `pulldown-cmark` ([ADR 0003](adr/0003-two-markdown-parsers.md)). CommonMark plus GFM tables, task lists, strikethrough, and footnotes. A Markdown Input joins at this stage |
+| 7 | Emit Typst | Events + Page Settings → Typst source | Internal only. Authors never see it |
 | 8 | Typeset | Typst source → PDF bytes | In-process, through a custom `World` |
 
 The Intermediate Markdown is the seam between two independent halves. Everything before it knows nothing about PDF, and everything after it knows nothing about MDX. Because a document can only ever contain Markdown ([ADR 0002](adr/0002-components-only-produce-markdown.md)), no document can depend on the typesetting engine, so replacing the engine would only affect stages 7 and 8.
@@ -49,7 +49,7 @@ Liquid and Expressions run at different times ([ADR 0001](adr/0001-liquid-is-the
 
 The scope for a file is `{ ...frontmatter, meta: frontmatter, props }`. A frontmatter key named `meta` or `props` is an error.
 
-An Expression's result becomes a text node, and the serializer escapes it. That's why `{company}` is safe with `A<B`. In text position, strings, numbers, and booleans print, and arrays or objects are an error.
+An Expression's result becomes a text node, and the serializer escapes it. That's why `{company}` is safe with `A<B`. Whitespace at the edges of the value is trimmed, because `*{x}*` with ` a ` has no Markdown spelling otherwise. In text position, strings, numbers, and booleans print, and arrays or objects are an error.
 
 Expression text goes to Liquid unchanged. The parser's fallback for expressions is brace matching rather than a JavaScript parser, so `|` isn't a problem. Evaluating to a typed value rather than a string is unproven *(Spike 3)*.
 
@@ -79,7 +79,7 @@ Expansion treats the Entry Document as a Component with no Props and no children
 instantiate(file, props, children):
     scope = { ...file.frontmatter, meta: file.frontmatter, props }
     text  = liquid(file.body, scope)
-    tree  = parse_dialect(text)
+    tree  = localize_references(parse_dialect(text))
     for each node in tree:
         Expression     → text node of evaluate(node, scope)
         <Content />    → children (error in the Entry Document)
@@ -112,7 +112,7 @@ Splicing expanded text into the source seems simpler, but MDX and Markdown disag
 
 Working on the tree avoids this, handles container prefixes, and escapes Expression results. It also means an unclosed `**` can't cross a Component boundary, because each file parses separately. So executable.md's healing step isn't needed.
 
-The cost is a serializer of our own, and that the intermediate doesn't preserve the author's formatting, such as `*` versus `_`. Neither affects the PDF.
+The cost is needing a reliable serializer, and that the intermediate doesn't preserve the author's formatting, such as `*` versus `_`. Neither affects the PDF.
 
 ### Inline and block tags
 
@@ -120,29 +120,62 @@ The cost is a serializer of our own, and that the intermediate doesn't preserve 
 
 ## Serialization
 
-Stage 5 uses our own serializer, covering only the 24 node kinds Expansion can produce. `mdast_util_to_markdown` [failed Spike 1](spikes.md#spike-1-markdown-serializer): it has no support for tables, footnotes, or strikethrough, drops task list checkboxes, and silently corrupts or panics on non-ASCII text next to a literal `*` or `_`.
+**Stage 5 uses `pulldown-cmark-to-cmark`**, through an adapter of about 340 lines from our tree to its events. In [Spike 1b](spikes.md#after-the-decisions) it round-tripped all 624 spec inputs that parse in the Dialect and all 47 curated cases, where `mdast_util_to_markdown` [failed Spike 1](spikes.md#spike-1-markdown-serializer) with 93.40% of spec examples and 33 of 47. If it becomes a problem, the fallback is our own serializer, covering only the 21 node kinds left after normalization.
 
-A serializer bug would silently change the document, so tests check this invariant on every fixture:
+**Block quote text:** it writes block quotes with a fixed ` > ` prefix, so `--emit-md` output can look slightly odd. That's accepted: PRD success criterion 1 asks for the same document, not the same text. A 5-line change to the crate would fix it, which is worth offering upstream as an option.
+
+### Normalization
+
+Before serializing, Expansion puts its tree into the form a parser would produce. This is needed with any serializer. Spike 1b ran these on a mock of Expansion:
+
+| Step | When | Why |
+|---|---|---|
+| Work out tight or loose from source lines | In `localize_references`, per file | `markdown` reports a list as spread when two blank lines follow it. A tight list would turn loose, and the serializer would add a dummy `[cmark-loose-1]: <>` definition to force that |
+| Resolve link and image references to inline form | In `localize_references`, per file | If two Components define `[docs]:` with different URLs, the first definition wins, so one link silently points to the wrong URL. The re-parsed tree still matches, so the [round-trip check](#round-trip-check) can't catch this |
+| Make footnote identifiers unique | In `localize_references`, per use | A Component with a footnote used twice would otherwise produce duplicate identifiers |
+| Merge adjacent text nodes | On the final tree | `a{x}b` makes three text nodes, and re-parsing gives one, so the check would fail on every inline Expression |
+| Drop empty nodes | On the final tree | `*{x}*` with an empty value would serialize to a literal `**` |
+| Trim spaces at the edges of paragraphs, headings, and table cells | On the final tree | A tag that expands to nothing can leave `Foo `, and a parser strips that space |
+| Drop hard breaks at the edges of a container, and trim the spaces around the rest | On the final tree | A leading hard break would be written as a blank line, and a parser strips those spaces |
+| Decide tight or loose per list, and make a list loose if an item holds two paragraphs in a row | On the final tree | CommonMark decides this per list. Two paragraphs grafted into a tight item would otherwise merge into `onetwo` |
+| Pad short table rows with empty cells | On the final tree | GFM treats a short row and a padded one the same |
+| Apply CommonMark's code span rule | In the adapter | `markdown` keeps a line break in a code span's value, where `pulldown-cmark` gives a space, so the two would never compare equal |
+
+Each file parses alone, so references already can't cross files, and resolving them loses nothing. It also removes `Definition`, `LinkReference`, and `ImageReference` from Stage 5, which leaves 21 node kinds.
+
+### Round-trip check
+
+A serializer bug would silently change the document. Some trees also have no Markdown form, such as `[<L />](/c)` where `L` expands to a link, because links can't nest.
+
+So `expand()` checks this on every run, not only in tests, and a mismatch is an error (R25). It compares `pulldown-cmark` events, because that's what Stage 6 will read:
 
 ```text
-parse_markdown(serialize(tree)) == tree, ignoring source positions
+parse_markdown(serialize(tree)) == to_events(tree), with adjacent text merged and link types ignored
 ```
 
-Besides normal escaping, it has to handle these cases, each of which broke in the spike:
+This costs one extra parse, and turns silent corruption into a clear failure. A wrong PDF that looks right is the worst outcome this tool can have. Spike 1b showed its value: it caught two grafted paragraphs merging into `onetwo`.
 
-- **Text that a later parse would change:** URLs and email addresses (GFM would autolink them), blank lines in a value, and `#` at the start of a heading's text.
-- **Non-ASCII text:** escaping decisions must work on characters, never treat byte offsets as character indexes.
-- **Nested emphasis:** `*_foo_*` must not become `**foo**`.
-- **Reference labels:** must keep their original text, including emphasis.
-- **Table cells:** a `|` needs escaping inside code spans too.
-- **Output format:** must stay readable, because PRD success criterion 1 pins the exact Markdown for the PRD's example.
+### Literal autolinks
+
+Literal autolinks are off, because R14 doesn't require them. Stage 3 sets `gfm_autolink_literal` to false, which avoids the nested links `markdown` produces for `[https://a.b](https://c.d)`. In Stage 6, `pulldown-cmark` left bare URLs as text throughout Spike 1b, so `https://a.b`, `www.a.b`, and `a@b.c` stay text with no escaping code. With literal autolinks on, a `markdown` re-parse fell from 99.69% to 97.70% of spec examples, and from 47 of 47 to 43 of 47 curated cases. The cost is that a bare URL prints as plain text and isn't clickable, so authors write `[text](url)` for a link. This is easy to reverse.
+
+### Known limits of the serializer
+
+Spike 1's failure cases, such as non-ASCII text, nested emphasis, and a `|` in a code span, all pass now and stay as test fixtures. These are what's left, and each one produces an error rather than a changed PDF:
+
+- Two hard breaks in a row, which it writes as a blank line.
+- A table cell ending in a `\`, such as `C:\dir\`.
+- A literal `\` just before a line break in a value.
+- A value with a non-breaking space at the edge of emphasis.
+
+The first two can come from hand-written documents, though they're rare.
 
 ## Renderer
 
 **Typst is the working choice, pending [Spike 4](spikes.md#spike-4-typst-embedding).** It runs in-process with no browser, its tagged PDF output is on by default since 0.14, and it brings pagination, footnotes, and bookmarks. Fulgur is the named fallback.
 
-- **Parsing:** the same `markdown` crate as stage 3, with the GFM grammar. One parser means one tree type and fewer disagreements.
-- **Emitting:** our own walk over the tree that writes Typst source. Text must be escaped so that `$5 and $6` isn't math and `Issue #42` isn't code. The mechanism (an escape table, or string literals) is *(Spike 4)*.
+- **Parsing:** `pulldown-cmark`, with tables, task lists, strikethrough, and footnotes on. A Markdown Input never touches `markdown`, which can panic on ordinary typos ([ADR 0003](adr/0003-two-markdown-parsers.md)).
+- **Emitting:** our own walk over the events that writes Typst source. Text must be escaped so that `$5 and $6` isn't math and `Issue #42` isn't code. The mechanism (an escape table, or string literals) is *(Spike 4)*.
 
 | Markdown | Typst |
 |---|---|
@@ -188,8 +221,8 @@ Keys are engine-neutral, and values are validated by our own code, so Typst synt
 | Crate | Job | Depends on |
 |---|---|---|
 | `mdx2pdf-cli` | The `mdx2pdf` binary: arguments, diagnostics, exit codes | The other two |
-| `mdx2pdf-expand` | Project → Intermediate Markdown | No PDF dependencies |
-| `mdx2pdf-render` | Intermediate Markdown + Page Settings → PDF bytes | Typst |
+| `mdx2pdf-expand` | Project → Intermediate Markdown | `markdown`, `liquid`, `pulldown-cmark-to-cmark`. No PDF dependencies |
+| `mdx2pdf-render` | Intermediate Markdown + Page Settings → PDF bytes | `pulldown-cmark`, Typst |
 
 The split keeps Expansion tests from compiling Typst, and makes the seam a compile-time fact. The two library interfaces can stay very small:
 
@@ -209,7 +242,8 @@ Versions are current as of 2026-11-02, and each was traced to its upstream proje
 
 | Crate | Version | Use | Risk and notes |
 |---|---|---|---|
-| [`markdown`](https://github.com/wooorm/markdown-rs) | 1.0.0 | Dialect and Markdown parsing | **Medium.** Stable 1.0 with full CommonMark claims, but no commits on main since 2025-04-23 and 65 open PRs. Be ready to fork |
+| [`markdown`](https://github.com/wooorm/markdown-rs) | 1.0.0 | Dialect parsing in Stage 3 | **High.** It's the only Rust parser for MDX syntax we found, but it has no commits on main since 2025-04-23 and 65 open PRs, and [Spike 1b](spikes.md#spike-1b-event-based-serializer) found inputs that panic it or produce malformed trees. Guard it with `catch_unwind`, validate its trees, and be ready to fork |
+| [`pulldown-cmark-to-cmark`](https://github.com/Byron/pulldown-cmark-to-cmark), [`pulldown-cmark`](https://github.com/pulldown-cmark/pulldown-cmark) | 23.0.0, 0.13.6 | Tree → Markdown in Stage 5, and Markdown parsing in Stage 6 | **Low to medium.** Passed [Spike 1b](spikes.md#spike-1b-event-based-serializer) with no panics. It's on its 23rd major version and moving fast, so pin it exactly and expect upgrade work |
 | [`liquid`](https://github.com/cobalt-org/liquid-rust) | 0.26.11 | Liquid Pass and Expressions | **Medium.** Last release 2025-02. Still tended, with dependency updates through 2026-10 and a maintainer commit in 2026-07, but little new work. Aims for Shopify conformance |
 | [`typst`, `typst-pdf`, `typst-kit`, `typst-assets`](https://github.com/typst/typst) | 0.15.1 | Typesetting and PDF | **Medium.** Actively developed, but expect breaking changes on upgrade. Needs Rust 1.92+. The upstream README only covers the CLI, so the library crates are confirmed through docs.rs and the changelog |
 | [`serde-saphyr`](https://github.com/bourumir-wyngs/serde-saphyr) | 2.0.0 | Frontmatter YAML | **Low to medium.** Young (created 2025-09), but fuzz-tested, with resource budgets. Rejects duplicate keys by default. Deserializing to Liquid values is *(Spike 3)* |
@@ -223,6 +257,8 @@ Versions are current as of 2026-11-02, and each was traced to its upstream proje
 | Option | Why not |
 |---|---|
 | `mdast_util_to_markdown` | [Failed Spike 1](spikes.md#spike-1-markdown-serializer): 93.40% of spec examples, missing GFM node kinds, and panics and silent corruption on non-ASCII text |
+| Our own serializer | Kept as the fallback. It means owning roughly 600–900 lines of escaping and delimiter logic, where the adapter is about 340 |
+| `markdown` for Stage 6 | Panics on ordinary typos. See [ADR 0003](adr/0003-two-markdown-parsers.md) |
 | `serde_yaml` | Deprecated by its author |
 | `serde_yml` | [RUSTSEC-2025-0068](https://rustsec.org/packages/serde_yml.html): unsound and unmaintained |
 | `mdxjs` | Compiles MDX to JavaScript, which we'd then need a runtime for |
@@ -230,7 +266,7 @@ Versions are current as of 2026-11-02, and each was traced to its upstream proje
 | `fulgur` | Kept as the fallback rather than the first choice. Created 2026-03, its README says API stability isn't guaranteed and that output can vary across machines, which conflicts with R23 |
 | `genpdf` | Last released in 2021 |
 | `cmarker` | Adds a second Markdown parser, and its raw-Typst comments conflict with R13 |
-| `comrak`, `pulldown-cmark` | Actively maintained, but neither parses MDX, so using one would add a second parser. These are the natural alternatives if `markdown` fails stage 6 |
+| `comrak` | Actively maintained, but doesn't parse MDX, and we found no evidence about the round-trip fidelity of its `format_commonmark` |
 
 ## Diagnostics
 
@@ -241,6 +277,8 @@ Errors use `miette` where a source span is available, and name the file in every
 | YAML, `page.toml` | Parser spans | Good |
 | Liquid | The engine's error message | To be seen *(Spike 3)* |
 | MDX parse, unknown Component, Props | Spans into the **Liquid output**, not the source | **Weak.** After the Liquid Pass, line numbers no longer match the file |
+| Round-trip check | The first difference between the trees | **Weak.** It compares the whole document, so it can show the text but not always which Component produced it |
+| A panic or malformed tree from `markdown` | The file being parsed, caught by a `catch_unwind` guard *(Spike 2)* | **Weak.** It has no location, so the message suggests checking for an unclosed code fence |
 
 Mapping Liquid output back to source lines probably isn't practical, so the fallback is to show the rendered snippet along with the file name *(Spike 3)*.
 
@@ -260,7 +298,7 @@ Common mistakes get specific hints. See [known hazards](#known-hazards).
 | Level | How |
 |---|---|
 | Expansion | `insta` snapshots of fixture Projects → Intermediate Markdown |
-| Serialization | The round-trip invariant on every fixture, plus the CommonMark spec examples |
+| Serialization | The production path (Dialect, normalize, serialize, `pulldown-cmark`) on all parseable spec inputs and curated cases, plus Expansion-shaped trees and randomized text values in every container. No unexplained misses, with an explicit list of exclusions such as `Html` |
 | Hazards | One fixture for each row of [known hazards](#known-hazards) |
 | CLI | `assert_cmd`: exit codes, messages, `--emit-md`, `--page` |
 | PDF content | Text extraction with `pdftotext`, a test-only tool |
@@ -287,7 +325,7 @@ Common mistakes get specific hints. See [known hazards](#known-hazards).
 
 ## Known hazards
 
-Small inputs likely to break a naive implementation. Each gets a test fixture, and the failures are the reason for specific hints in error messages. Behaviors marked with a spike other than Spike 1 haven't been observed yet.
+Small inputs likely to break a naive implementation. Each gets a test fixture, and the failures are the reason for specific hints in error messages. Behaviors marked with a spike other than Spikes 1 and 1b haven't been observed yet.
 
 | Input | Problem | Handling | Spike |
 |---|---|---|---|
@@ -306,16 +344,28 @@ Small inputs likely to break a naive implementation. Each gets a test fixture, a
 | `Use {curly} braces` | Read as an Expression | Undefined-variable error, with `\{` as the fix | 2 |
 | `{x \| replace: "}", ""}` | Brace matching may not understand strings | Find out, then document | 2 |
 | `$5 and $6`, `Issue #42` | Typst reads them as math and code | Escaping in stage 7 | 4 |
-| A long inline code span with a line break before `[`, in LF or CRLF | Panicked `mdast_util_to_markdown`, and tests whether line breaks in code spans survive | Our serializer has its own fixture for it | 1 |
-| `é\*x\*é`, `при_вет_` | Non-ASCII text beside a literal `*` or `_` corrupted or panicked the crate | Our serializer has a fixture for each | 1 |
-| `https://a.b` as an Expression result | Text that GFM would turn into a link | Our serializer escapes it | 1 |
-| `a\n\nb` as an Expression result | A blank line splits the paragraph | Our serializer encodes the line breaks, for example as `&#10;` | 1 |
+| A long inline code span with a line break before `[`, in LF or CRLF | Panicked `mdast_util_to_markdown`, and tests whether line breaks in code spans survive | The serializer has its own fixture for it | 1 |
+| `é\*x\*é`, `при_вет_` | Non-ASCII text beside a literal `*` or `_` corrupted or panicked the crate | The serializer has a fixture for each | 1 |
+| `https://a.b` as an Expression result | Text that GFM would turn into a link | Literal autolinks are off, so it stays text | 1 |
+| `a\n\nb` as an Expression result | A blank line splits the paragraph | The serializer encodes the line breaks, for example as `&#10;` | 1 |
+| `a{x}b` | Three text nodes, where re-parsing gives one | Merge adjacent text | 1b |
+| `*{x}*` with an empty `x` | Serializes to a literal `**` | Drop empty nodes | 1b |
+| `*{x}*` with `x` as ` a ` | Edge spaces have no spelling inside emphasis | Expressions trim their values | 1b |
+| Two Components each defining `[docs]:` with different URLs | One link silently points to the wrong URL, and the round-trip check can't see it | Resolve references per file | 1b |
+| A Component with `[^1]`, used twice | Duplicate footnote identifiers | Unique identifiers per use | 1b |
+| `<Content />` in a tight list item, given two paragraphs | They merge into `onetwo` | Make the list loose | 1b |
+| `x<B />y`, where `B` expands to `*(a)*` | CommonMark won't read `x*(a)*y` as emphasis | The serializer writes `&#120;*(a)*&#121;`, which round-trips | 1b |
+| `[<L />](/c)`, where `L` expands to a link | Has no Markdown form, because links can't nest | The round-trip check reports an error | 1b |
+| Two hard breaks in a row | The serializer writes a blank line, which splits the paragraph | The round-trip check reports an error | 1b |
+| `` "1. ```\n- x\n" ``: an unclosed fence in a list item, then a different kind of list | Panics the `markdown` parser | Guard Stage 3 and report an error. Stage 6 uses `pulldown-cmark`, so a Markdown Input is unaffected | 1b, 2 |
+| `- a`, two blank lines, then `# b` | `markdown` reports the list as spread, so it would turn loose and gain a dummy definition | Work out tight or loose from source lines | 1b |
+| A table cell ending in `\`, such as `C:\dir\` | The serializer writes the `\` right before the cell's closing pipe, which then reads as an escaped pipe | The round-trip check reports an error | 1b |
 
 ## Delivery
 
 1. **Prepare.** Done: `.devcontainer/install.sh` installs Rust 1.92 or later when the container starts.
-2. **[Spikes](spikes.md).** Run them and record findings. Update this document, and write an ADR for the Renderer once Spike 4 settles it. Delete the spike code.
-3. **Milestone 1: Markdown to PDF.** `mdx2pdf-cli` and `mdx2pdf-render`, Markdown Input, `--page`. This is already a useful tool, and it proves the second half of the pipeline.
-4. **Milestone 2: Projects without Components.** Frontmatter, Liquid, Expressions, `--emit-md`, serialization.
+2. **[Spikes](spikes.md).** Run them in the order given there and record findings. Update this document, and write an ADR for the Renderer once Spike 4 settles it. Delete the spike code once Spike 1's suites have moved into the real tests.
+3. **Milestone 1: Markdown to PDF.** `mdx2pdf-cli` and `mdx2pdf-render`, Markdown Input, `--page`. This is already a useful tool, it proves the second half of the pipeline, and it doesn't need `markdown` at all.
+4. **Milestone 2: Projects without Components.** Frontmatter, Liquid, Expressions, `--emit-md`, normalization, serialization, and the round-trip check.
 5. **Milestone 3: Components.** Resolution, Props, `<Content />`, unraveling, recursion errors.
 6. **Milestone 4: Release.** Error-message hints for every known hazard, default styling, and prebuilt binaries.

@@ -100,6 +100,8 @@ The result is this Intermediate Markdown, which is then typeset:
 > Review **Beta** before Q3 Report ships.
 ```
 
+The real text can differ in spacing, such as a ` > ` prefix on block quote lines, but it's the same document.
+
 Authors have two kinds of template syntax, each with its own job:
 
 | | `{{ x }}` and `{% ... %}` | `{ x }` |
@@ -138,7 +140,7 @@ Exit codes are `0` for success, `1` for a problem with the document, and `2` for
 
 - **R5.** Read YAML frontmatter from each MDX file, available as `meta.x` and as top-level `x`. `meta` and `props` are reserved names.
 - **R6.** Run the Liquid Pass over the whole body of each MDX file before reading it as MDX. Literal `{{` and `{%` need `{% raw %}`, including inside code fences.
-- **R7.** Evaluate Expressions using Liquid syntax, such as `{props.name | upcase}`, after reading the file as MDX. Their results can't create markup.
+- **R7.** Evaluate Expressions using Liquid syntax, such as `{props.name | upcase}`, after reading the file as MDX. Their results can't create markup, and whitespace at the edges of a value is trimmed.
 - **R8.** Report `import`, `export`, and lowercase tags such as `<div>` as errors that explain the alternative.
 
 ### Components
@@ -168,10 +170,11 @@ Exit codes are `0` for success, `1` for a problem with the document, and `2` for
 - **R22.** Never use the network.
 - **R23.** The same input and tool version produce a byte-identical PDF.
 - **R24.** Errors name the file and, where possible, the location and a suggested fix.
+- **R25.** If the result of Expansion can't be represented exactly in Markdown, report an error rather than produce a changed PDF.
 
 ## Success criteria
 
-1. The example above produces exactly the Intermediate Markdown shown, and a correct PDF.
+1. The example above produces the same document as the Intermediate Markdown shown, and a correct PDF. Differences in spacing don't count, as long as both parse to the same document.
 2. The binary produces a PDF on a clean machine with no network and nothing else installed.
 3. Two runs on the same input produce byte-identical PDFs.
 4. Writing `--emit-md` into the Project directory and rendering that file with the same Page Settings produces a PDF identical to the original.
@@ -188,5 +191,6 @@ Each has a working default, used until someone decides otherwise.
 | Can Components read the Entry Document's frontmatter? | No, pass values through Props |
 | `{/* comment */}`, which MDX authors expect | Accept it as a comment |
 | Namespaced Components such as `<Ns.Sub />` | Later |
+| Bare URLs such as `https://a.b`, which GFM can turn into links | Print as plain text. Literal autolinks are off in both the Dialect and Markdown, so authors write `[text](url)` for a link |
 | Fonts beyond the bundled ones | Load them from a `fonts/` directory in the Project. Never system fonts, because they'd break R23 |
 | Performance and binary-size targets | Spike 4 measures them, then a person sets the bar |
