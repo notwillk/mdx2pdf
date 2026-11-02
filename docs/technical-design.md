@@ -2,7 +2,7 @@
 
 **Status:** Proposal, 2026-11-02. Requirements (R1–R24) are in the [PRD](prd.md), and terms are in the [glossary](../GLOSSARY.md).
 
-**Nothing here has been run.** Claims about how crates behave come from their documentation, and the [spikes](spikes.md) exist to test them. Choices marked *(Spike N)* could change once that spike reports.
+**Only Spike 1 has been run.** Other claims about how crates behave come from their documentation, and the [spikes](spikes.md) exist to test them. Choices marked *(Spike N)* could change once that spike reports.
 
 ## Pipeline
 
@@ -112,7 +112,7 @@ Splicing expanded text into the source seems simpler, but MDX and Markdown disag
 
 Working on the tree avoids this, handles container prefixes, and escapes Expression results. It also means an unclosed `**` can't cross a Component boundary, because each file parses separately. So executable.md's healing step isn't needed.
 
-The cost is a dependency on a serializer *(Spike 1)*, and that the intermediate doesn't preserve the author's formatting, such as `*` versus `_`. Neither affects the PDF.
+The cost is a serializer of our own, and that the intermediate doesn't preserve the author's formatting, such as `*` versus `_`. Neither affects the PDF.
 
 ### Inline and block tags
 
@@ -120,13 +120,22 @@ The cost is a dependency on a serializer *(Spike 1)*, and that the intermediate 
 
 ## Serialization
 
-Stage 5 uses `mdast_util_to_markdown` if it passes *(Spike 1)*. Otherwise we write our own, covering only the node kinds we produce.
+Stage 5 uses our own serializer, covering only the 24 node kinds Expansion can produce. `mdast_util_to_markdown` [failed Spike 1](spikes.md#spike-1-markdown-serializer): it has no support for tables, footnotes, or strikethrough, drops task list checkboxes, and silently corrupts or panics on non-ASCII text next to a literal `*` or `_`.
 
 A serializer bug would silently change the document, so tests check this invariant on every fixture:
 
 ```text
 parse_markdown(serialize(tree)) == tree, ignoring source positions
 ```
+
+Besides normal escaping, it has to handle these cases, each of which broke in the spike:
+
+- **Text that a later parse would change:** URLs and email addresses (GFM would autolink them), blank lines in a value, and `#` at the start of a heading's text.
+- **Non-ASCII text:** escaping decisions must work on characters, never treat byte offsets as character indexes.
+- **Nested emphasis:** `*_foo_*` must not become `**foo**`.
+- **Reference labels:** must keep their original text, including emphasis.
+- **Table cells:** a `|` needs escaping inside code spans too.
+- **Output format:** must stay readable, because PRD success criterion 1 pins the exact Markdown for the PRD's example.
 
 ## Renderer
 
@@ -201,7 +210,6 @@ Versions are current as of 2026-11-02, and each was traced to its upstream proje
 | Crate | Version | Use | Risk and notes |
 |---|---|---|---|
 | [`markdown`](https://github.com/wooorm/markdown-rs) | 1.0.0 | Dialect and Markdown parsing | **Medium.** Stable 1.0 with full CommonMark claims, but no commits on main since 2025-04-23 and 65 open PRs. Be ready to fork |
-| `mdast_util_to_markdown` | 0.0.2 | Tree → Markdown | **High.** Lives in the same repo and was released the same day, but is an early version whose crates.io entry has no repository link. [PR #271](https://github.com/wooorm/markdown-rs/pull/271), a CRLF panic fix, is unmerged. Normalizing to LF avoids that case |
 | [`liquid`](https://github.com/cobalt-org/liquid-rust) | 0.26.11 | Liquid Pass and Expressions | **Medium.** Last release 2025-02. Still tended, with dependency updates through 2026-10 and a maintainer commit in 2026-07, but little new work. Aims for Shopify conformance |
 | [`typst`, `typst-pdf`, `typst-kit`, `typst-assets`](https://github.com/typst/typst) | 0.15.1 | Typesetting and PDF | **Medium.** Actively developed, but expect breaking changes on upgrade. Needs Rust 1.92+. The upstream README only covers the CLI, so the library crates are confirmed through docs.rs and the changelog |
 | [`serde-saphyr`](https://github.com/bourumir-wyngs/serde-saphyr) | 2.0.0 | Frontmatter YAML | **Low to medium.** Young (created 2025-09), but fuzz-tested, with resource budgets. Rejects duplicate keys by default. Deserializing to Liquid values is *(Spike 3)* |
@@ -214,6 +222,7 @@ Versions are current as of 2026-11-02, and each was traced to its upstream proje
 
 | Option | Why not |
 |---|---|
+| `mdast_util_to_markdown` | [Failed Spike 1](spikes.md#spike-1-markdown-serializer): 93.40% of spec examples, missing GFM node kinds, and panics and silent corruption on non-ASCII text |
 | `serde_yaml` | Deprecated by its author |
 | `serde_yml` | [RUSTSEC-2025-0068](https://rustsec.org/packages/serde_yml.html): unsound and unmaintained |
 | `mdxjs` | Compiles MDX to JavaScript, which we'd then need a runtime for |
@@ -278,7 +287,7 @@ Common mistakes get specific hints. See [known hazards](#known-hazards).
 
 ## Known hazards
 
-Small inputs likely to break a naive implementation. Each gets a test fixture, and the failures are the reason for specific hints in error messages. Behaviors marked with a spike haven't been observed yet.
+Small inputs likely to break a naive implementation. Each gets a test fixture, and the failures are the reason for specific hints in error messages. Behaviors marked with a spike other than Spike 1 haven't been observed yet.
 
 | Input | Problem | Handling | Spike |
 |---|---|---|---|
@@ -297,11 +306,14 @@ Small inputs likely to break a naive implementation. Each gets a test fixture, a
 | `Use {curly} braces` | Read as an Expression | Undefined-variable error, with `\{` as the fix | 2 |
 | `{x \| replace: "}", ""}` | Brace matching may not understand strings | Find out, then document | 2 |
 | `$5 and $6`, `Issue #42` | Typst reads them as math and code | Escaping in stage 7 | 4 |
-| A long inline code span with CRLF line endings | The panic addressed by PR #271 | Normalize to LF in stage 1 | 1 |
+| A long inline code span with a line break before `[`, in LF or CRLF | Panicked `mdast_util_to_markdown`, and tests whether line breaks in code spans survive | Our serializer has its own fixture for it | 1 |
+| `é\*x\*é`, `при_вет_` | Non-ASCII text beside a literal `*` or `_` corrupted or panicked the crate | Our serializer has a fixture for each | 1 |
+| `https://a.b` as an Expression result | Text that GFM would turn into a link | Our serializer escapes it | 1 |
+| `a\n\nb` as an Expression result | A blank line splits the paragraph | Our serializer encodes the line breaks, for example as `&#10;` | 1 |
 
 ## Delivery
 
-1. **Prepare.** Add Rust 1.92 or later to the devcontainer, which doesn't have it yet.
+1. **Prepare.** Done: `.devcontainer/install.sh` installs Rust 1.92 or later when the container starts.
 2. **[Spikes](spikes.md).** Run them and record findings. Update this document, and write an ADR for the Renderer once Spike 4 settles it. Delete the spike code.
 3. **Milestone 1: Markdown to PDF.** `mdx2pdf-cli` and `mdx2pdf-render`, Markdown Input, `--page`. This is already a useful tool, and it proves the second half of the pipeline.
 4. **Milestone 2: Projects without Components.** Frontmatter, Liquid, Expressions, `--emit-md`, serialization.
