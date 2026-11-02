@@ -2,7 +2,7 @@
 
 **Status:** Proposal, 2026-11-02. Requirements (R1–R25) are in the [PRD](prd.md), and terms are in the [glossary](../GLOSSARY.md).
 
-**Only Spikes 1 and 1b have been run.** Other claims about how crates behave come from their documentation, and the [spikes](spikes.md) exist to test them. Choices marked *(Spike N)* could change once that spike reports.
+**Only Spikes 1, 1b, and 2 have been run.** Other claims about how crates behave come from their documentation, and the [spikes](spikes.md) exist to test them. Choices marked *(Spike N)* could change once that spike reports.
 
 ## Pipeline
 
@@ -27,7 +27,7 @@ flowchart TD
 |---|---|---|---|
 | 1 | Split frontmatter | File text → YAML values, body | Done on raw text, because Liquid needs the values before anything is parsed. Line endings are normalized to LF here |
 | 2 | Liquid Pass | Body + scope → text | Runs on text, so it can generate tags |
-| 3 | Parse Dialect | Text → tree | With `markdown`, inside a panic guard. JSX and expressions on; ESM, HTML, indented code, and literal autolinks off |
+| 3 | Parse Dialect | Text → tree | With `markdown`, inside a [panic guard](#parsing-the-dialect). JSX and expressions on; ESM, HTML, indented code, and literal autolinks off |
 | 4 | Expand | Tree → normalized tree with no MDX nodes | Runs stages 1–3 again for each Component use. See [normalization](#normalization) |
 | 5 | Serialize | Tree → Markdown string | With `pulldown-cmark-to-cmark`. The string is the required intermediate. Re-parsed and [checked](#round-trip-check) on every run |
 | 6 | Parse Markdown | String → events | With `pulldown-cmark` ([ADR 0003](adr/0003-two-markdown-parsers.md)). CommonMark plus GFM tables, task lists, strikethrough, and footnotes. A Markdown Input joins at this stage |
@@ -51,7 +51,38 @@ The scope for a file is `{ ...frontmatter, meta: frontmatter, props }`. A frontm
 
 An Expression's result becomes a text node, and the serializer escapes it. That's why `{company}` is safe with `A<B`. Whitespace at the edges of the value is trimmed, because `*{x}*` with ` a ` has no Markdown spelling otherwise. In text position, strings, numbers, and booleans print, and arrays or objects are an error.
 
-Expression text goes to Liquid unchanged. The parser's fallback for expressions is brace matching rather than a JavaScript parser, so `|` isn't a problem. Evaluating to a typed value rather than a string is unproven *(Spike 3)*.
+Expression text goes to Liquid unchanged, with two exceptions from [Spike 2](spikes.md#spike-2-dialect-parsing): in a table cell, `\|` becomes `|`, and continuation lines of a multi-line Expression lose up to two leading spaces. Only a string spanning lines could notice the second one, so it's documented rather than fixed. `{/* comment */}` is dropped rather than evaluated. Evaluating to a typed value rather than a string is unproven *(Spike 3)*.
+
+## Parsing the Dialect
+
+[Spike 2](spikes.md#spike-2-dialect-parsing) confirmed that `markdown` gives the tree this design needs, with correct nesting and exact single-line Expression text. It also showed that Stage 3 needs more than a function call:
+
+| Addition | Why |
+|---|---|
+| A `catch_unwind` guard, a silent panic hook, and `panic = "unwind"` in the release profile | Stock 1.0.0 panics on ordinary typos. All 1,591 panics in 250,000 random documents were caught |
+| A tree validator for parent-child rules | Stock 1.0.0 can put a list directly in a list. Spike 2 flagged 15 in 100,000 Markdown-heavy documents |
+| An `mdx_expression_parse` callback that tracks quotes and braces | Plain brace matching ends `{x \| replace: "}", ""}` early, with no error |
+| An ESM check on top-level paragraphs, reading the source line | With ESM off, `import` prints as text. It has to report statements but not `import duties rose` (R8) |
+| An unterminated tag check on text nodes: `<` plus an uppercase letter, unless escaped | `<Card title="x"` with no `>` silently prints as text. *(Untested, Spike 5)* |
+| A check for paragraphs containing a table delimiter row | An unescaped filter pipe in a table's header can silently turn the whole table into a paragraph. *(Untested, Spike 5)* |
+| A depth limit on Expansion | The parser survives nesting 100,000 deep, but a recursive walk aborted the process there, and a guard can't catch that. The limit should sit well below that, since Expansion's frames are bigger |
+
+**Fork.** Stage 3 uses a small fork with six open upstream PRs ([ADR 0004](adr/0004-fork-the-markdown-parser.md)). It takes panics from 1,591 to 5 and malformed trees from 15 to 0, and it fixes `<Card title="AT&T" />`. The guard and validator stay, because the fork still has a rare panic. The counts in the table above are for stock 1.0.0.
+
+**Size limits.** Parsing is superlinear: a 256 KB table takes about 13 seconds. Normal documents are well below that, but Liquid loops can generate large tables.
+
+### How the Dialect differs from Markdown
+
+| Author writes | In the Dialect | Hint |
+|---|---|---|
+| Lowercase tags such as `<div>` or `<table>…</table>` | Parsed as tags, then an error from us, or a parser error if unclosed (R8) | Use a Component |
+| `<!-- x -->` | Error | `{/* text */}` |
+| `<https://a.b>` | Error | `[text](url)` |
+| `[a](<b c>)` | Error | Percent-encode the space |
+| Text indented by 4 spaces | A paragraph, silently | Use a fence for code |
+| `{x}` | An Expression | `\{` for a literal brace |
+| `List<String>`, `a<1` | Error | `\<` |
+| `a < b`, `a > b`, `}` | Text, as in Markdown | |
 
 ## Components
 
@@ -116,7 +147,7 @@ The cost is needing a reliable serializer, and that the intermediate doesn't pre
 
 ### Inline and block tags
 
-`<Note>hi</Note>` alone on a line parses as inline JSX in a paragraph. As in `@mdx-js/mdx`, a paragraph holding only tags and whitespace is unwrapped to block level ("unraveling"). A Component used mid-sentence must expand to a single paragraph, whose contents replace the tag. Anything else is an error with the location *(Spikes 2 and 5)*.
+`<Note>hi</Note>` alone on a line parses as inline JSX in a paragraph. As in `@mdx-js/mdx`, a paragraph holding only tags and whitespace, including line breaks, is unwrapped to block level ("unraveling"). The parser already does this for some shapes, such as `<A /> <B />`, but not for `<A>x</A> <B>y</B>`. A Component used mid-sentence must expand to a single paragraph, whose contents replace the tag. Anything else is an error with the location *(Spike 5)*.
 
 ## Serialization
 
@@ -242,7 +273,7 @@ Versions are current as of 2026-11-02, and each was traced to its upstream proje
 
 | Crate | Version | Use | Risk and notes |
 |---|---|---|---|
-| [`markdown`](https://github.com/wooorm/markdown-rs) | 1.0.0 | Dialect parsing in Stage 3 | **High.** It's the only Rust parser for MDX syntax we found, but it has no commits on main since 2025-04-23 and 65 open PRs, and [Spike 1b](spikes.md#spike-1b-event-based-serializer) found inputs that panic it or produce malformed trees. Guard it with `catch_unwind`, validate its trees, and be ready to fork |
+| [`markdown`](https://github.com/wooorm/markdown-rs) | 1.0.0 plus six PRs, as [our fork](adr/0004-fork-the-markdown-parser.md) | Dialect parsing in Stage 3 | **Medium to high.** It's the only Rust parser for MDX syntax we found, but upstream has no commits on main since 2025-04-23 and 65 open PRs, so we own any further fixes. [Spike 2](spikes.md#spike-2-dialect-parsing) confirmed the tree is what we need. Pin the fork by commit. Its own test suite hasn't been run yet |
 | [`pulldown-cmark-to-cmark`](https://github.com/Byron/pulldown-cmark-to-cmark), [`pulldown-cmark`](https://github.com/pulldown-cmark/pulldown-cmark) | 23.0.0, 0.13.6 | Tree → Markdown in Stage 5, and Markdown parsing in Stage 6 | **Low to medium.** Passed [Spike 1b](spikes.md#spike-1b-event-based-serializer) with no panics. It's on its 23rd major version and moving fast, so pin it exactly and expect upgrade work |
 | [`liquid`](https://github.com/cobalt-org/liquid-rust) | 0.26.11 | Liquid Pass and Expressions | **Medium.** Last release 2025-02. Still tended, with dependency updates through 2026-10 and a maintainer commit in 2026-07, but little new work. Aims for Shopify conformance |
 | [`typst`, `typst-pdf`, `typst-kit`, `typst-assets`](https://github.com/typst/typst) | 0.15.1 | Typesetting and PDF | **Medium.** Actively developed, but expect breaking changes on upgrade. Needs Rust 1.92+. The upstream README only covers the CLI, so the library crates are confirmed through docs.rs and the changelog |
@@ -276,9 +307,9 @@ Errors use `miette` where a source span is available, and name the file in every
 |---|---|---|
 | YAML, `page.toml` | Parser spans | Good |
 | Liquid | The engine's error message | To be seen *(Spike 3)* |
-| MDX parse, unknown Component, Props | Spans into the **Liquid output**, not the source | **Weak.** After the Liquid Pass, line numbers no longer match the file |
+| MDX parse, unknown Component, Props | Spans into the **Liquid output**, not the source. Every parse error in Spike 2 had one, and tags and Expressions point at their source, but attributes have no position of their own | **Weak.** After the Liquid Pass, line numbers no longer match the file |
 | Round-trip check | The first difference between the trees | **Weak.** It compares the whole document, so it can show the text but not always which Component produced it |
-| A panic or malformed tree from `markdown` | The file being parsed, caught by a `catch_unwind` guard *(Spike 2)* | **Weak.** It has no location, so the message suggests checking for an unclosed code fence |
+| A panic or malformed tree from `markdown` | The file being parsed, caught by a `catch_unwind` guard | **Weak, but rare.** It has no location, so the message suggests checking for an unclosed tag. The fork leaves one known shape: a table header, then a list containing an unclosed `<` |
 
 Mapping Liquid output back to source lines probably isn't practical, so the fallback is to show the rendered snippet along with the file name *(Spike 3)*.
 
@@ -325,12 +356,12 @@ Common mistakes get specific hints. See [known hazards](#known-hazards).
 
 ## Known hazards
 
-Small inputs likely to break a naive implementation. Each gets a test fixture, and the failures are the reason for specific hints in error messages. Behaviors marked with a spike other than Spikes 1 and 1b haven't been observed yet.
+Small inputs likely to break a naive implementation. Each gets a test fixture, and the failures are the reason for specific hints in error messages. Behaviors marked only with a spike other than 1, 1b, and 2 haven't been observed yet.
 
 | Input | Problem | Handling | Spike |
 |---|---|---|---|
 | `run: echo ${{ secrets.TOKEN }}` in a code fence | Liquid evaluates it or fails | By design (R6). Error hint suggests `{% raw %}` | 3 |
-| `{{ company }}` with `company: "A<B"` | Value breaks MDX parsing | Use `{company}`. Error hint suggests it | 3, 5 |
+| `{{ company }}` with `company: "A<B"` | Value is read as MDX. `A<B, C` is an error, and `A<B and more` silently stays text | Use `{company}`. Error hint suggests it, and the unterminated tag check catches the silent case | 2, 3, 5 |
 | `<Card title="{{ t }}" />` with `t: 'Say "hi"'` | Value breaks the attribute | A custom filter to quote values as attributes | 3 |
 | `{% for i in xs %}<Card title={i.name} />{% endfor %}` | `i` no longer exists when `{i.name}` runs | Clear undefined-variable error suggesting `{{ }}` | 3, 5 |
 | `<A style={{color: "red"}} />` | MDX habit, and Liquid claims the `{{` | Error hint explaining the difference | 3 |
@@ -339,10 +370,17 @@ Small inputs likely to break a naive implementation. Each gets a test fixture, a
 | `Hello <Note /> there`, where `Note` has two paragraphs | Blocks in inline position | Error with location | 5 |
 | `    total` inside a tag | A paragraph in MDX, code in Markdown | Tree expansion and serialization | 1, 5 |
 | `\<div>` | Text in MDX, and unescaped would be an HTML block in Markdown | Serializer must escape it | 1 |
-| `<https://a.b>`, `<!-- x -->`, `<br>` | Legal Markdown, but not legal in the Dialect | Listed differences, with hints such as using `[text](url)` | 2 |
-| `import Chart from './Chart.mdx'` | With ESM off, silently prints as text | Must be detected and reported (R8) | 2 |
+| `<https://a.b>`, `<!-- x -->`, `<br>` | Legal Markdown, but parser errors in the Dialect | [Listed differences](#how-the-dialect-differs-from-markdown), with hints such as using `[text](url)` | 2 |
+| `import Chart from './Chart.mdx'` | With ESM off, silently prints as text | The ESM check reports it (R8), and leaves `import duties rose` alone | 2 |
 | `Use {curly} braces` | Read as an Expression | Undefined-variable error, with `\{` as the fix | 2 |
-| `{x \| replace: "}", ""}` | Brace matching may not understand strings | Find out, then document | 2 |
+| `{x \| replace: "}", ""}` | Brace matching ends the Expression at the `}` in the string, silently | The expression callback tracks strings | 2 |
+| `<Card title="AT&T" />` | Panics stock `markdown` | Our fork parses it correctly | 2 |
+| `<A>hi`, `---`, `</A>` | Panics stock `markdown`: an unclosed tag before a setext underline | Our fork gives a located error | 2 |
+| `<Card title="x"`, with no `>` | Silently prints as text | Unterminated tag check | 2, 5 |
+| `\| {x \| upcase} \|` in a table header | The pipe can change the cell count, so the whole table silently becomes a paragraph | Check for delimiter rows in paragraphs. Hint: write `\|` | 2, 5 |
+| `\| {x \| upcase} \|` in a table body | Clear error at the cell's `{` | Hint: write `\|`, which Expansion turns back into a plain pipe before Liquid | 2, 5 |
+| A document nested 100,000 levels deep | The parser survives, but a recursive walk aborts the process, and a guard can't catch that | Depth limit in Expansion | 2 |
+| A table of 256 KB or more, perhaps from a Liquid loop | Takes 13 seconds or more to parse | Reported only. Consider a size limit | 2 |
 | `$5 and $6`, `Issue #42` | Typst reads them as math and code | Escaping in stage 7 | 4 |
 | A long inline code span with a line break before `[`, in LF or CRLF | Panicked `mdast_util_to_markdown`, and tests whether line breaks in code spans survive | The serializer has its own fixture for it | 1 |
 | `é\*x\*é`, `при_вет_` | Non-ASCII text beside a literal `*` or `_` corrupted or panicked the crate | The serializer has a fixture for each | 1 |
@@ -357,7 +395,7 @@ Small inputs likely to break a naive implementation. Each gets a test fixture, a
 | `x<B />y`, where `B` expands to `*(a)*` | CommonMark won't read `x*(a)*y` as emphasis | The serializer writes `&#120;*(a)*&#121;`, which round-trips | 1b |
 | `[<L />](/c)`, where `L` expands to a link | Has no Markdown form, because links can't nest | The round-trip check reports an error | 1b |
 | Two hard breaks in a row | The serializer writes a blank line, which splits the paragraph | The round-trip check reports an error | 1b |
-| `` "1. ```\n- x\n" ``: an unclosed fence in a list item, then a different kind of list | Panics the `markdown` parser | Guard Stage 3 and report an error. Stage 6 uses `pulldown-cmark`, so a Markdown Input is unaffected | 1b, 2 |
+| `` "1. ```\n- x\n" ``: an unclosed fence in a list item, then a different kind of list | Panics stock `markdown` | Our fork parses it correctly. Stage 6 uses `pulldown-cmark`, so a Markdown Input is unaffected | 1b, 2 |
 | `- a`, two blank lines, then `# b` | `markdown` reports the list as spread, so it would turn loose and gain a dummy definition | Work out tight or loose from source lines | 1b |
 | A table cell ending in `\`, such as `C:\dir\` | The serializer writes the `\` right before the cell's closing pipe, which then reads as an escaped pipe | The round-trip check reports an error | 1b |
 
@@ -366,6 +404,6 @@ Small inputs likely to break a naive implementation. Each gets a test fixture, a
 1. **Prepare.** Done: `.devcontainer/install.sh` installs Rust 1.92 or later when the container starts.
 2. **[Spikes](spikes.md).** Run them in the order given there and record findings. Update this document, and write an ADR for the Renderer once Spike 4 settles it. Delete the spike code once Spike 1's suites have moved into the real tests.
 3. **Milestone 1: Markdown to PDF.** `mdx2pdf-cli` and `mdx2pdf-render`, Markdown Input, `--page`. This is already a useful tool, it proves the second half of the pipeline, and it doesn't need `markdown` at all.
-4. **Milestone 2: Projects without Components.** Frontmatter, Liquid, Expressions, `--emit-md`, normalization, serialization, and the round-trip check.
+4. **Milestone 2: Projects without Components.** First create the [`markdown` fork](adr/0004-fork-the-markdown-parser.md) and run its test suite. Then frontmatter, Liquid, Expressions, `--emit-md`, normalization, serialization, and the round-trip check.
 5. **Milestone 3: Components.** Resolution, Props, `<Content />`, unraveling, recursion errors.
 6. **Milestone 4: Release.** Error-message hints for every known hazard, default styling, and prebuilt binaries.

@@ -1,6 +1,6 @@
 # Spikes
 
-Short experiments to test the riskiest assumptions in the [technical design](technical-design.md) before building on them. Status as of 2026-11-02: Spike 1 failed, Spike 1b passed every bar except exact output and its recommendations were accepted, and Spikes 2–5 haven't started.
+Short experiments to test the riskiest assumptions in the [technical design](technical-design.md) before building on them. Status as of 2026-11-02: Spike 1 failed, Spike 1b passed every bar except exact output and its recommendations were accepted, Spike 2 passed with required changes and its fork recommendation was accepted, and Spikes 3–5 haven't started.
 
 ## Ground rules
 
@@ -17,16 +17,15 @@ Short experiments to test the riskiest assumptions in the [technical design](tec
 |---|---|---|---|
 | [1](#spike-1-markdown-serializer) | Can `mdast_util_to_markdown` round-trip reliably? | 0.5 day | **Failed.** Go to Spike 1b |
 | [1b](#spike-1b-event-based-serializer) | Can `pulldown-cmark-to-cmark` serialize our trees through a small adapter? | 0.5 day | Write our own serializer. **Not needed:** it passed every bar except exact output |
-| [2](#spike-2-dialect-parsing) | Does `markdown` parse the Dialect? | 0.5 day | Work around the gaps, or change parser |
+| [2](#spike-2-dialect-parsing) | Does `markdown` parse the Dialect? | 0.5 day | Work around the gaps, or change parser. **Not needed:** it passed, with required changes |
 | [3](#spike-3-liquid-behavior) | Does `liquid` behave the way the design needs? | 1 day | Custom filters, weaker errors, or a fork |
 | [4](#spike-4-typst-embedding) | Can Typst embed cleanly and deterministically? | 1–2 days | Try Fulgur |
 | [5](#spike-5-end-to-end-expansion) | Does Expansion work end to end? | 1–2 days | Revisit the expansion design |
 
 Run the remaining spikes in this order:
 
-1. **Spike 2** comes next, because the serializer's adapter depends on the parser's tree types, and Spike 1b found inputs that panic the parser.
-2. **Spikes 3 and 4** can run in either order.
-3. **Spike 5** comes last, because it needs a working serializer and normalization.
+1. **Spikes 3 and 4** can run in either order.
+2. **Spike 5** comes last, because it needs a working serializer and normalization.
 
 ## Spike 1: Markdown serializer
 
@@ -88,7 +87,7 @@ Ignoring the 23 that can't reach Stage 5 still leaves 20 misses, over the limit 
 
 **The two panic bugs:**
 
-1. **Non-ASCII text (`state.rs:513`).** `value.chars().nth(*position)` uses a byte offset as a character index. After any non-ASCII text, it reads the wrong character and encodes that instead, or slices inside a character. This is the more serious bug, and no open PR we looked at addresses it.
+1. **Non-ASCII text (`state.rs:513`).** `value.chars().nth(*position)` uses a byte offset as a character index. After any non-ASCII text, it reads the wrong character and encodes that instead, or slices inside a character. This is the more serious bug. These findings said no open PR addressed it, but Spike 2's review of the PR list found [#181](https://github.com/wooorm/markdown-rs/pull/181), which targets it, and [#272](https://github.com/wooorm/markdown-rs/pull/272) for the task list bug. Neither was tested, and neither changes the verdict.
 2. **Inline code (`inline_code.rs:54`).** This is the PR #271 panic, but **it isn't specific to CRLF**. `&value[position..m.len()]` is evaluated before the CR check, so plain LF panics too, on input straight from the parser: a long code span with a line break before `[`. Normalizing to LF doesn't avoid it, which corrects the earlier claim in the design. The same text in `inline_math.rs` has the same bug, though the Dialect doesn't use math.
 
 **Beyond the spike's method:**
@@ -307,7 +306,123 @@ This bar was "no panics". It changed because Spike 1b already found inputs that 
 
 **If it fails:** Pre-process around small gaps, fork if a fix is needed, or write a small tag scanner of our own, as executable.md does.
 
-**Findings:** _Not started._
+**Findings (2026-11-02): passed, with required changes. Recommendation: carry a small fork.** **Decision:** accepted on 2026-11-02 ([ADR 0004](adr/0004-fork-the-markdown-parser.md)). Numbers are from `spikes/02-dialect/results/`, and a second run of the deterministic suites matched exactly.
+
+| Bar | Result |
+|---|---|
+| Correct nesting | **Pass.** 16 of 16 cases, including tags in lists, quotes, tables, and other tags, with block children |
+| Expression text preserved | **Pass with the callback below.** Without it, `{x \| replace: "}", ""}` silently closes early. Multi-line Expressions have one small limit |
+| No panic escapes the guard | **Pass.** None of 1,591 panics in 250,000 documents escaped, and a known document parsed the same afterward. The parser also survives nesting 100,000 deep |
+| Written list of differences | **Pass.** See below |
+
+The table suite had 79 cases with results written in advance, and 73 matched. The 6 surprises: `<A /> <B />` is already two blocks, the two prose cases and the header-row table below, the continuation-line limit below, and one case where the predicted behavior was right but the expected text had a typo.
+
+**The panics are more ordinary than Spike 1b suggested:**
+
+| Input | Stock 1.0.0 | Why it matters |
+|---|---|---|
+| `<Card title="AT&T" />`, `<Card title="a&b" />` | Panic at `character_reference.rs:196` | **An `&` followed by letters at the end of an attribute.** A company name can trigger it, including one from a Liquid value. `"a & b"`, `"a&b c"`, and `"AT&amp;T"` are fine |
+| `<A>hi`, `---`, `</A>` on separate lines | Panic at `to_mdast.rs:1277` | An unclosed tag before a setext underline |
+| `` - ``` ``, then `1. x` | Panic at `to_mdast.rs:1817` | An unclosed fence, as Spike 1b found. `` * ``` ``, then `-`, gives a malformed tree |
+| `a`, `-`, `--`, `a`, `-` | Panic at `to_mdast.rs:193` | Adjacent setext headings |
+| `[](a (a` + space, newline, `))` | Panic at `subtokenize.rs:149` | A link title ending in a space and a line break |
+
+The guard catches all of these, but a caught panic has no location, while all 14 of the table suite's parse errors do. So the guard alone means `AT&T` in an attribute reports only "the parser crashed in this file".
+
+**Silent failures the guard can't help with.** Each of these produces a tree, not an error, so each needs its own handling:
+
+| Input | Result | Handling |
+|---|---|---|
+| `<Card title="x"`, with the `>` missing | **Prints as literal text.** Also `<Card` and `a <Card title="x" b`, and `a <Card b={1}` prints `a <Card b=` plus an Expression | A check on text nodes, untested (see below) |
+| `A<B and more`, `if a<b then` | Stays text, while `A<B, C`, `List<String>`, and `Vec<u8> here` are errors | Same check, for uppercase tag names. A lowercase `a<b` stays text |
+| A table whose header has `{x \| upcase}`, when the pipe makes the cell count differ | **The whole table becomes a paragraph**, printing `\|---\|` | A check on paragraphs, untested. In a body row it's a clear error instead, at the cell's `{` |
+| `{x \| replace: "}", ""}` | The Expression is `x \| replace: "`, followed by the literal text `", ""}` | The callback below |
+
+**Expressions:**
+
+- **Single-line text is exact,** including `|` and surrounding spaces.
+- **A small callback fixes strings.** Setting `mdx_expression_parse` to a roughly 15-line scanner that tracks quotes and braces makes `}` and `{` inside strings work, in text and in attributes. It changed only the intended case among the 79. The trade-off is that `{it's}` becomes an error, where before it was an Expression that Liquid would reject anyway.
+- **Multi-line limit:** continuation lines lose up to two leading spaces beyond any container prefix, so `{a`, `    b}` gives `a`, `  b`. Liquid ignores that whitespace except inside a string spanning lines, so documenting it is enough.
+- **In table cells, an escaped pipe stays escaped.** `{x \| upcase}` gives the value `x \| upcase`, so Expansion must turn `\|` back into `|` before Liquid sees it, in cell Expressions and in attributes on tags in cells. This handling is untested.
+- **`{/* comment */}`** is an Expression with the value `/* comment */`, so it works as a comment if Expansion drops it, as the PRD says it should. The parser's own error for `<!-- x -->` suggests this syntax too.
+
+**Attributes** appear as expected: `b={1}` is an expression value, `c="x"` a decoded literal, `d` has no value, and `{...b}` is an expression attribute that the design rejects. Attribute nodes have no positions, so errors about one have to point at its tag. Tag and Expression nodes point at their source: 52 of 52.
+
+**Inline and block tags.** The design's assumption holds, with one refinement. `<Note>hi</Note>` alone on a line is inline in a paragraph. But `<A /> <B />` and `<A /> {x}` are already blocks, so the parser does some unraveling itself. `<A>x</A> <B>y</B>` stays a paragraph, and so does a tag on each of two lines, which has a `"\n"` text node between them, so unraveling must treat line breaks as whitespace.
+
+**Detecting ESM.** The method assumed ESM off plus a rejecting `mdx_esm_parse`, but the parser only consults that callback with `mdx_esm` on (`mdx_esm.rs:48-50`), so these are the real options:
+
+| Detector | Score of 19 | Misses |
+|---|---|---|
+| Top-level paragraph at column 1 starting with `import ` or `export ` | 16 | Also flags `import duties rose sharply`, `export the file as a PDF`, and an indented `import` |
+| ESM on, with a rejecting callback | 17 | Also flags the same two prose lines |
+| **The first check, reading the source line and requiring it to look like a statement** | **19** | None |
+
+**Use the third.** It scored 17 on its first version, and it was fixed after seeing the results, so 19 of 19 is on a small set rather than proof. A statement is `import` followed by a quote, `{`, `*`, or text containing ` from `, or `export` followed by `const`, `let`, `var`, `function`, `class`, `default`, `async`, `{`, or `*`. A `\import` is an escape if it ever misfires.
+
+**How the Dialect differs from Markdown**, across all 652 spec examples: 498 give the same tree, 81 a different tree, and 73 an error.
+
+| Author writes | In Markdown | In the Dialect | Examples |
+|---|---|---|---|
+| A closed HTML block such as `<table>…</table>` | Raw HTML | **Component-like tags with parsed children.** Then rejected because they're lowercase (R8) | 30 different |
+| Unclosed HTML such as `<div>`, `<a href="x">`, or `<br>` | Raw HTML | Error: "Expected a closing tag" | 42 errors with HTML off, some with other causes |
+| `<!-- x -->`, `<?php ?>`, `<![CDATA[ ]]>` | Raw HTML | Error at the `!` or `?`. The comment error suggests `{/* text */}` | Included above |
+| Text indented 4 spaces or a tab | Code block | **A paragraph, silently** | 50 different, 4 more combined with HTML |
+| `<https://a.b>`, `<a@b.c>` | Autolink | Error, suggesting `[text](url)` | 17 errors |
+| `<` where Markdown reads text or a link destination, such as `[a](<b c>)` or `<a b c>` | Text or part of the URL | Error | 14 errors |
+| `{x}` | Text | An Expression | None in the spec |
+| `a<1`, `3 <4` | Text | Error | Not in the spec's differences |
+| `a < b`, `a <b`, `a > b`, a lone `}` | Text | Text | Same |
+
+The last different tree is example 91, where a lowercase tag with a multi-line attribute parses as a tag, which R8 rejects anyway. The counts add up to the totals: 30, 50, and 1 different, and 42, 17, and 14 errors.
+
+**Depth and scaling:**
+
+- **The parser didn't overflow.** Parsing and dropping a tree nested 100,000 deep works on the default 8 MB stack for quotes and inline tags, though it takes over two minutes. Links and braces also finished at 100,000. Block tags reached 50,000. Lists, ordered lists, and emphasis reached 10,000, then hit the 20-second limit, so they're unproven beyond that.
+- **Recursive walks do overflow.** The spike's validator walked 50,000 levels, but aborted the process at 100,000 on quotes, inline tags, and block tags, and `catch_unwind` can't stop that. A 1 GiB thread contained it for quotes and inline tags. So Expansion, which is recursive and has bigger frames, needs a depth limit, as the design already assumes. Its frames haven't been measured, so the limit should be set well below these numbers.
+- **Parsing is superlinear, and the guard won't stop a slow parse.** This is reported only:
+
+| Input size | Prose | Tags | Expressions | List | Brackets | Table rows |
+|---|---|---|---|---|---|---|
+| 64 KB | 0.008s | 0.075s | 0.073s | 0.102s | 0.097s | 0.602s |
+| 256 KB | 0.055s | 0.450s | 0.616s | 1.149s | 2.200s | 13.201s |
+| 1 MB | 0.435s | 8.843s | 13.036s | 27.374s | 42.292s | Over 60s |
+
+Normal documents are well below where this matters, and each file parses separately. A generated table is the likeliest way to hit it: a 256 KB table takes 13 seconds. Liquid loops can generate one, so Spike 5 should keep this in mind. Open PRs target scaling, including [#197](https://github.com/wooorm/markdown-rs/pull/197) and [#238](https://github.com/wooorm/markdown-rs/pull/238). They weren't tested.
+
+**Is the stale crate a practical problem? Yes, but a small fork solves it.** Upstream's last commit is still 2025-04-23, while fixes keep arriving as open PRs. Of the panic PRs reviewed, these six apply cleanly together:
+
+| PR | Commit | Fixes |
+|---|---|---|
+| [#265](https://github.com/wooorm/markdown-rs/pull/265) | `e26c525bd7` | `AT&T` in an attribute, a one-line bounds check |
+| [#267](https://github.com/wooorm/markdown-rs/pull/267) | `ccc6ed01ea` | A list after an item ending in unclosed code, including the malformed trees |
+| [#219](https://github.com/wooorm/markdown-rs/pull/219) | `a1129c332d` | A setext underline after an unclosed tag, which becomes a located error |
+| [#210](https://github.com/wooorm/markdown-rs/pull/210) | `79d3a45e94` | Adjacent setext headings |
+| [#205](https://github.com/wooorm/markdown-rs/pull/205) | `44542f924d` | List item positions around code |
+| [#207](https://github.com/wooorm/markdown-rs/pull/207) | `d2efc4814c` | Whitespace in link titles and labels |
+
+Together they're 91 lines added and 23 removed across six source files, on `1506572`, with no manifest or `build.rs` changes. Patches are in `results/fork/`, and the commits above reproduce them. #265, #267, and #219 include their tests, and the other three are source only.
+
+| 250,000 documents | Stock 1.0.0 | Fork |
+|---|---|---|
+| Caught panics | 1,591 | **5** |
+| Malformed trees | 15 | **0** |
+| Position problems | 12 | 4 |
+
+The 5 left share one shape, `to_mdast.rs:1842`, such as `a||`, `-|-`, `1. <`: a table header, then a list containing an unclosed `<`. The guard still handles it. The 652 spec comparisons didn't change at all, and the other differences in the suites are panics becoming trees or errors, plus the malformed tree being fixed.
+
+**The fork's test suite wasn't run,** so that evidence is ours, not upstream's. Running it was denied by this environment's permission check. It needs the `swc_core` dev-dependency, and PR #271's author reports that a related dependency doesn't compile, with [#230](https://github.com/wooorm/markdown-rs/pull/230) open to fix CI. Do this before adopting the fork.
+
+**Estimate:** about half a day to set up the fork, run its tests, and pin it by commit, which is judgment. It costs little to carry, because upstream isn't moving, so there's nothing to rebase onto. The reasons to prefer it to the guard alone are `AT&T` and the malformed trees. The alternative is the guard plus a hint saying to check for `&` and unclosed fences, which is a poor message for ordinary mistakes.
+
+**Not tested:**
+
+- The proposed checks: unterminated tags, tables that became paragraphs, and `\|` unescaping. Spike 5 now covers them.
+- Trees that are well formed but wrong. The validator only checks shape and positions.
+- Inputs that take the callback outside the table suite.
+- The other open PRs, such as [#268](https://github.com/wooorm/markdown-rs/pull/268) and [#269](https://github.com/wooorm/markdown-rs/pull/269), which might let the design drop its own list tightness work.
+
+**Worth reporting upstream** (not reported yet): `<A b="AT&T" />` isn't specifically mentioned in #265's title, and a note there would show how ordinary it is. Also a table header followed by a list with an unclosed `<`, which no PR we reviewed covers.
 
 ## Spike 3: Liquid behavior
 
@@ -390,6 +505,8 @@ This bar was "no panics". It changed because Spike 1b already found inputs that 
 - Direct and indirect recursion.
 - Two Components defining the same reference label with different URLs, and a Component with a footnote used twice.
 - A tree with no Markdown form, which must give an error: `[<L />](/c)`, where `L` expands to a link.
+- Spike 2's untested handling: `<Card title="x"` with no `>` must be an error, a table whose header has an unescaped filter pipe must be an error, and `{x \| upcase}` in a cell must reach Liquid as `x | upcase`.
+- `{/* comment */}` must produce nothing, and a generated 256 KB table must finish or fail clearly.
 - Every remaining row of the known hazards table.
 
 **Pass:**
