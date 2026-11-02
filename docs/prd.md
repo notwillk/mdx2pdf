@@ -112,6 +112,8 @@ Authors have two kinds of template syntax, each with its own job:
 
 So `{company}` is safe when `company` is `A<B`, while `{{ company }}` isn't. Loop variables exist only during the first kind, so loops use `{{ item.name }}`.
 
+Inside a table cell, escape a filter's pipe with a backslash, as in `{x \| upcase}`, because a bare `|` ends the cell.
+
 ## Command line
 
 ```text
@@ -140,7 +142,7 @@ Exit codes are `0` for success, `1` for a problem with the document, and `2` for
 
 - **R5.** Read YAML frontmatter from each MDX file, available as `meta.x` and as top-level `x`. `meta` and `props` are reserved names.
 - **R6.** Run the Liquid Pass over the whole body of each MDX file before reading it as MDX. Literal `{{` and `{%` need `{% raw %}`, including inside code fences.
-- **R7.** Evaluate Expressions using Liquid syntax, such as `{props.name | upcase}`, after reading the file as MDX. Their results can't create markup, and whitespace at the edges of a value is trimmed.
+- **R7.** Evaluate Expressions using Liquid syntax, such as `{props.name | upcase}`, after reading the file as MDX. Their results can't create markup, and whitespace at the edges of a value is trimmed. In a table cell, a filter's pipe is written `\|`.
 - **R8.** Report `import`, `export`, and lowercase tags such as `<div>` as errors that explain the alternative.
 
 ### Components
@@ -171,6 +173,7 @@ Exit codes are `0` for success, `1` for a problem with the document, and `2` for
 - **R23.** The same input and tool version produce a byte-identical PDF.
 - **R24.** Errors name the file and, where possible, the location and a suggested fix.
 - **R25.** If the result of Expansion can't be represented exactly in Markdown, report an error rather than produce a changed PDF.
+- **R26.** Report a tag with no closing `>`, and a table that a bare pipe turned into a paragraph, as errors rather than printing them as text.
 
 ## Success criteria
 

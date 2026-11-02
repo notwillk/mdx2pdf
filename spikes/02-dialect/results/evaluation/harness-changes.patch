@@ -1,5 +1,5 @@
 --- a/src/main.rs	2026-11-02 20:50:08.620726340 +0000
-+++ b/src/main.rs	2026-11-02 21:16:59.946568294 +0000
++++ b/src/main.rs	2026-11-02 21:26:26.438569394 +0000
 @@ -668,7 +668,7 @@
          }
      };
@@ -26,7 +26,7 @@
          Some("one") => {
              for input in &args[1..] {
                  let input = input.replace("\\n", "\n");
-@@ -967,3 +968,60 @@
+@@ -967,3 +968,68 @@
          _ => eprintln!("usage: spike-dialect run|deep <label>"),
      }
  }
@@ -50,6 +50,14 @@
 +}
 +
 +fn extra() {
++    let mut base = [0usize; 2];
++    for (input, should) in cases::ESM {
++        if let Outcome::Tree(t) = parse(input, &dialect()) {
++            if esm_refined_check(&t, input) == *should { base[0] += 1; }
++            if esm_stricter(&t, input) == *should { base[1] += 1; }
++        }
++    }
++    println!("--- the spike's own {} ESM cases: refined {}, stricter {}", cases::ESM.len(), base[0], base[1]);
 +    println!("--- ESM: (want) refined stricter | input");
 +    for (input, want) in [
 +        ("import duties from China rose sharply\n", false),

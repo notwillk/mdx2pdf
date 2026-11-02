@@ -1,3 +1,4 @@
+--- the spike's own 19 ESM cases: refined 19, stricter 19
 --- ESM: (want) refined stricter | input
   (-) BAD ok  | "import duties from China rose sharply\n" [tree]
   (-) BAD ok  | "import data from sources\n" [tree]

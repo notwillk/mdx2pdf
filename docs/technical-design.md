@@ -1,6 +1,6 @@
 # Technical design
 
-**Status:** Proposal, 2026-11-02. Requirements (R1–R25) are in the [PRD](prd.md), and terms are in the [glossary](../GLOSSARY.md).
+**Status:** Proposal, 2026-11-02. Requirements (R1–R26) are in the [PRD](prd.md), and terms are in the [glossary](../GLOSSARY.md).
 
 **Only Spikes 1, 1b, and 2 have been run.** Other claims about how crates behave come from their documentation, and the [spikes](spikes.md) exist to test them. Choices marked *(Spike N)* could change once that spike reports.
 
@@ -62,14 +62,15 @@ Expression text goes to Liquid unchanged, with two exceptions from [Spike 2](spi
 | A `catch_unwind` guard, a silent panic hook, and `panic = "unwind"` in the release profile | Stock 1.0.0 panics on ordinary typos. All 1,591 panics in 250,000 random documents were caught |
 | A tree validator for parent-child rules | Stock 1.0.0 can put a list directly in a list. Spike 2 flagged 15 in 100,000 Markdown-heavy documents |
 | An `mdx_expression_parse` callback that tracks quotes and braces | Plain brace matching ends `{x \| replace: "}", ""}` early, with no error |
-| An ESM check on top-level paragraphs, reading the source line | With ESM off, `import` prints as text. It has to report statements but not `import duties rose` (R8) |
+| For a quote left open in an Expression: re-parse with plain brace matching to find it, and reject an Expression containing a blank line | With the callback alone, `{it's}` on line 1 reports its error at the end of the file, and a stray quote can swallow later blocks into one Expression. *(Untested, Spike 5)* |
+| An ESM check on top-level paragraphs, reading the source line | With ESM off, `import` prints as text. It has to report statements but not prose such as `import duties from China rose`, so `from` must be followed by a quote (R8). It still flags `export class action lawsuits`, and the hint is to write `&#101;xport`, because a backslash would print |
 | An unterminated tag check on text nodes: `<` plus an uppercase letter, unless escaped | `<Card title="x"` with no `>` silently prints as text. *(Untested, Spike 5)* |
 | A check for paragraphs containing a table delimiter row | An unescaped filter pipe in a table's header can silently turn the whole table into a paragraph. *(Untested, Spike 5)* |
 | A depth limit on Expansion | The parser survives nesting 100,000 deep, but a recursive walk aborted the process there, and a guard can't catch that. The limit should sit well below that, since Expansion's frames are bigger |
 
-**Fork.** Stage 3 uses a small fork with six open upstream PRs ([ADR 0004](adr/0004-fork-the-markdown-parser.md)). It takes panics from 1,591 to 5 and malformed trees from 15 to 0, and it fixes `<Card title="AT&T" />`. The guard and validator stay, because the fork still has a rare panic. The counts in the table above are for stock 1.0.0.
+**Fork.** Stage 3 uses a small fork, built from six patches taken from open upstream PRs ([ADR 0004](adr/0004-fork-the-markdown-parser.md)). It takes panics from 1,591 to 5 and malformed trees from 15 to 0, with or without the expression callback, and it fixes `<Card title="AT&T" />`. The guard and validator stay, because the fork still has a rare panic. The counts in the table above are for stock 1.0.0.
 
-**Size limits.** Parsing is superlinear: a 256 KB table takes about 13 seconds. Normal documents are well below that, but Liquid loops can generate large tables.
+**Size limits.** Parsing is superlinear: a 256 KB table takes about 13 seconds, and neither the fork nor the callback changes that much. Normal documents are well below that, but Liquid loops can generate large tables.
 
 ### How the Dialect differs from Markdown
 
@@ -273,7 +274,7 @@ Versions are current as of 2026-11-02, and each was traced to its upstream proje
 
 | Crate | Version | Use | Risk and notes |
 |---|---|---|---|
-| [`markdown`](https://github.com/wooorm/markdown-rs) | 1.0.0 plus six PRs, as [our fork](adr/0004-fork-the-markdown-parser.md) | Dialect parsing in Stage 3 | **Medium to high.** It's the only Rust parser for MDX syntax we found, but upstream has no commits on main since 2025-04-23 and 65 open PRs, so we own any further fixes. [Spike 2](spikes.md#spike-2-dialect-parsing) confirmed the tree is what we need. Pin the fork by commit. Its own test suite hasn't been run yet |
+| [`markdown`](https://github.com/wooorm/markdown-rs) | 1.0.0 plus six patches, as [our fork](adr/0004-fork-the-markdown-parser.md) | Dialect parsing in Stage 3 | **Medium to high.** It's the only Rust parser for MDX syntax we found, but upstream has no commits on main since 2025-04-23 and 65 open PRs, so we own any further fixes. [Spike 2](spikes.md#spike-2-dialect-parsing) confirmed the tree is what we need. Pin the fork by commit. Its own test suite hasn't been run yet |
 | [`pulldown-cmark-to-cmark`](https://github.com/Byron/pulldown-cmark-to-cmark), [`pulldown-cmark`](https://github.com/pulldown-cmark/pulldown-cmark) | 23.0.0, 0.13.6 | Tree → Markdown in Stage 5, and Markdown parsing in Stage 6 | **Low to medium.** Passed [Spike 1b](spikes.md#spike-1b-event-based-serializer) with no panics. It's on its 23rd major version and moving fast, so pin it exactly and expect upgrade work |
 | [`liquid`](https://github.com/cobalt-org/liquid-rust) | 0.26.11 | Liquid Pass and Expressions | **Medium.** Last release 2025-02. Still tended, with dependency updates through 2026-10 and a maintainer commit in 2026-07, but little new work. Aims for Shopify conformance |
 | [`typst`, `typst-pdf`, `typst-kit`, `typst-assets`](https://github.com/typst/typst) | 0.15.1 | Typesetting and PDF | **Medium.** Actively developed, but expect breaking changes on upgrade. Needs Rust 1.92+. The upstream README only covers the CLI, so the library crates are confirmed through docs.rs and the changelog |
@@ -307,7 +308,7 @@ Errors use `miette` where a source span is available, and name the file in every
 |---|---|---|
 | YAML, `page.toml` | Parser spans | Good |
 | Liquid | The engine's error message | To be seen *(Spike 3)* |
-| MDX parse, unknown Component, Props | Spans into the **Liquid output**, not the source. Every parse error in Spike 2 had one, and tags and Expressions point at their source, but attributes have no position of their own | **Weak.** After the Liquid Pass, line numbers no longer match the file |
+| MDX parse, unknown Component, Props | Spans into the **Liquid output**, not the source. Every parse error in Spike 2 had one, though an open quote's points at the end of the file, and tags and Expressions point at their source, but attributes have no position of their own | **Weak.** After the Liquid Pass, line numbers no longer match the file |
 | Round-trip check | The first difference between the trees | **Weak.** It compares the whole document, so it can show the text but not always which Component produced it |
 | A panic or malformed tree from `markdown` | The file being parsed, caught by a `catch_unwind` guard | **Weak, but rare.** It has no location, so the message suggests checking for an unclosed tag. The fork leaves one known shape: a table header, then a list containing an unclosed `<` |
 
@@ -371,14 +372,17 @@ Small inputs likely to break a naive implementation. Each gets a test fixture, a
 | `    total` inside a tag | A paragraph in MDX, code in Markdown | Tree expansion and serialization | 1, 5 |
 | `\<div>` | Text in MDX, and unescaped would be an HTML block in Markdown | Serializer must escape it | 1 |
 | `<https://a.b>`, `<!-- x -->`, `<br>` | Legal Markdown, but parser errors in the Dialect | [Listed differences](#how-the-dialect-differs-from-markdown), with hints such as using `[text](url)` | 2 |
-| `import Chart from './Chart.mdx'` | With ESM off, silently prints as text | The ESM check reports it (R8), and leaves `import duties rose` alone | 2 |
+| `import Chart from './Chart.mdx'` | With ESM off, silently prints as text | The ESM check reports it (R8), and leaves `import duties from China rose` alone | 2 |
+| `export class action lawsuits` at the start of a paragraph | The ESM check wrongly reports it, as it does `export default settings are fine` | Error hint: `&#101;xport`, because `\export` would print the backslash | 2 |
 | `Use {curly} braces` | Read as an Expression | Undefined-variable error, with `\{` as the fix | 2 |
 | `{x \| replace: "}", ""}` | Brace matching ends the Expression at the `}` in the string, silently | The expression callback tracks strings | 2 |
+| `{it's}` on line 1 of a long file | With the callback, the error points at the end of the file | Re-parse with brace matching to find the Expression with the open quote | 2, 5 |
+| `{it's} and {don't}`, or a stray quote with another quote later on | With the callback, the two become one Expression, and it can swallow whole blocks. Liquid will probably reject it, but that's untested | Reject an Expression containing a blank line, and rely on Liquid for the rest | 2, 3, 5 |
 | `<Card title="AT&T" />` | Panics stock `markdown` | Our fork parses it correctly | 2 |
 | `<A>hi`, `---`, `</A>` | Panics stock `markdown`: an unclosed tag before a setext underline | Our fork gives a located error | 2 |
-| `<Card title="x"`, with no `>` | Silently prints as text | Unterminated tag check | 2, 5 |
-| `\| {x \| upcase} \|` in a table header | The pipe can change the cell count, so the whole table silently becomes a paragraph | Check for delimiter rows in paragraphs. Hint: write `\|` | 2, 5 |
-| `\| {x \| upcase} \|` in a table body | Clear error at the cell's `{` | Hint: write `\|`, which Expansion turns back into a plain pipe before Liquid | 2, 5 |
+| `<Card title="x"`, with no `>` | Silently prints as text | Unterminated tag check (R26) | 2, 5 |
+| `\| {x \| upcase} \|` in a table header | The pipe can change the cell count, so the whole table silently becomes a paragraph | Check for delimiter rows in paragraphs (R26). Hint: escape the pipe with a backslash | 2, 5 |
+| `\| {x \| upcase} \|` in a table body | Clear error at the cell's `{` | Hint: escape the pipe with a backslash, which Expansion removes before Liquid | 2, 5 |
 | A document nested 100,000 levels deep | The parser survives, but a recursive walk aborts the process, and a guard can't catch that | Depth limit in Expansion | 2 |
 | A table of 256 KB or more, perhaps from a Liquid loop | Takes 13 seconds or more to parse | Reported only. Consider a size limit | 2 |
 | `$5 and $6`, `Issue #42` | Typst reads them as math and code | Escaping in stage 7 | 4 |
@@ -402,8 +406,8 @@ Small inputs likely to break a naive implementation. Each gets a test fixture, a
 ## Delivery
 
 1. **Prepare.** Done: `.devcontainer/install.sh` installs Rust 1.92 or later when the container starts.
-2. **[Spikes](spikes.md).** Run them in the order given there and record findings. Update this document, and write an ADR for the Renderer once Spike 4 settles it. Delete the spike code once Spike 1's suites have moved into the real tests.
+2. **[Spikes](spikes.md).** Run them in the order given there and record findings. Update this document, and write an ADR for the Renderer once Spike 4 settles it. The spike code stays in `spikes/` as evidence, and Spike 1's suites move into the real tests.
 3. **Milestone 1: Markdown to PDF.** `mdx2pdf-cli` and `mdx2pdf-render`, Markdown Input, `--page`. This is already a useful tool, it proves the second half of the pipeline, and it doesn't need `markdown` at all.
-4. **Milestone 2: Projects without Components.** First create the [`markdown` fork](adr/0004-fork-the-markdown-parser.md) and run its test suite. Then frontmatter, Liquid, Expressions, `--emit-md`, normalization, serialization, and the round-trip check.
+4. **Milestone 2: Projects without Components.** First create the [`markdown` fork](adr/0004-fork-the-markdown-parser.md) from its saved patches, and run its test suite. Then frontmatter, Liquid, Expressions, `--emit-md`, normalization, serialization, and the round-trip check.
 5. **Milestone 3: Components.** Resolution, Props, `<Content />`, unraveling, recursion errors.
 6. **Milestone 4: Release.** Error-message hints for every known hazard, default styling, and prebuilt binaries.

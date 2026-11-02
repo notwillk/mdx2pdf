@@ -4,12 +4,12 @@ Short experiments to test the riskiest assumptions in the [technical design](tec
 
 ## Ground rules
 
-- **Throwaway code.** Each spike lives in `spikes/NN-name/` and gets deleted once its findings are recorded. The exception is `spikes/01-serializer/`, which stays until its test suites move into the real tests, because the findings link to it. Nothing graduates into the real crates without being rewritten.
+- **Disposable code, kept as evidence.** Each spike lives in `spikes/NN-name/`, committed with its results so the findings can be checked and reproduced. Nothing graduates into the real crates without being rewritten.
 - **Timeboxed.** When time runs out, record what's known and decide whether more is worth it.
 - **Objective result.** Each spike has a pass condition set in advance. Change a bar only by writing down why.
 - **Findings go here.** A result that settles a hard-to-reverse decision also gets an [ADR](adr/), and the design gets updated.
 
-**Prerequisite:** Rust 1.92 or later, which the Typst crates need. `.devcontainer/install.sh` installs it each time the container starts, if it's missing.
+**Prerequisite:** Rust 1.92 or later, which the Typst crates need. `.devcontainer/install.sh` installs it each time the container starts, if it's missing. Turn off core dumps with `ulimit -c 0` before running Spike 2, for the reason in [`spikes/README.md`](../spikes/README.md).
 
 ## Overview
 
@@ -306,7 +306,7 @@ This bar was "no panics". It changed because Spike 1b already found inputs that 
 
 **If it fails:** Pre-process around small gaps, fork if a fix is needed, or write a small tag scanner of our own, as executable.md does.
 
-**Findings (2026-11-02): passed, with required changes. Recommendation: carry a small fork.** **Decision:** accepted on 2026-11-02 ([ADR 0004](adr/0004-fork-the-markdown-parser.md)). Numbers are from `spikes/02-dialect/results/`, and a second run of the deterministic suites matched exactly.
+**Findings (2026-11-02): passed, with required changes. Recommendation: carry a small fork.** **Decision:** accepted on 2026-11-02 ([ADR 0004](adr/0004-fork-the-markdown-parser.md)). Numbers are from `spikes/02-dialect/results/`, and later runs of the deterministic suites matched exactly. The [evaluation](#evaluation-of-spike-2) below corrects some of what follows.
 
 | Bar | Result |
 |---|---|
@@ -341,7 +341,7 @@ The guard catches all of these, but a caught panic has no location, while all 14
 **Expressions:**
 
 - **Single-line text is exact,** including `|` and surrounding spaces.
-- **A small callback fixes strings.** Setting `mdx_expression_parse` to a roughly 15-line scanner that tracks quotes and braces makes `}` and `{` inside strings work, in text and in attributes. It changed only the intended case among the 79. The trade-off is that `{it's}` becomes an error, where before it was an Expression that Liquid would reject anyway.
+- **A small callback fixes strings.** Setting `mdx_expression_parse` to a roughly 15-line scanner that tracks quotes and braces makes `}` and `{` inside strings work, in text and in attributes. It changed only the intended case among the 79. The trade-off is that `{it's}` becomes an error, where before it was an Expression that Liquid would reject anyway, and that error points at the end of the file.
 - **Multi-line limit:** continuation lines lose up to two leading spaces beyond any container prefix, so `{a`, `    b}` gives `a`, `  b`. Liquid ignores that whitespace except inside a string spanning lines, so documenting it is enough.
 - **In table cells, an escaped pipe stays escaped.** `{x \| upcase}` gives the value `x \| upcase`, so Expansion must turn `\|` back into `|` before Liquid sees it, in cell Expressions and in attributes on tags in cells. This handling is untested.
 - **`{/* comment */}`** is an Expression with the value `/* comment */`, so it works as a comment if Expansion drops it, as the PRD says it should. The parser's own error for `<!-- x -->` suggests this syntax too.
@@ -358,7 +358,7 @@ The guard catches all of these, but a caught panic has no location, while all 14
 | ESM on, with a rejecting callback | 17 | Also flags the same two prose lines |
 | **The first check, reading the source line and requiring it to look like a statement** | **19** | None |
 
-**Use the third.** It scored 17 on its first version, and it was fixed after seeing the results, so 19 of 19 is on a small set rather than proof. A statement is `import` followed by a quote, `{`, `*`, or text containing ` from `, or `export` followed by `const`, `let`, `var`, `function`, `class`, `default`, `async`, `{`, or `*`. A `\import` is an escape if it ever misfires.
+**Use the third, tightened by the [evaluation](#evaluation-of-spike-2).** It scored 17 on its first version and was fixed after seeing the results, so its 19 of 19 was on its own test set. A statement is now `import` followed by a quote, `{`, `*`, or ` from ` and then a quote, or `export` followed by `const`, `let`, `var`, `function`, `class`, `default`, `async`, `{`, or `*`. If it misfires, the escape is `&#105;mport` or `&#101;xport`. A backslash isn't an escape here, because `\import` prints the backslash.
 
 **How the Dialect differs from Markdown**, across all 652 spec examples: 498 give the same tree, 81 a different tree, and 73 an error.
 
@@ -378,7 +378,7 @@ The last different tree is example 91, where a lowercase tag with a multi-line a
 
 **Depth and scaling:**
 
-- **The parser didn't overflow.** Parsing and dropping a tree nested 100,000 deep works on the default 8 MB stack for quotes and inline tags, though it takes over two minutes. Links and braces also finished at 100,000. Block tags reached 50,000. Lists, ordered lists, and emphasis reached 10,000, then hit the 20-second limit, so they're unproven beyond that.
+- **The parser didn't overflow.** Parsing and dropping a tree nested 100,000 deep works on the default 8 MB stack for quotes, inline tags, and block tags, though it takes two to three minutes (`results/evaluation/depth.txt`). Links and braces also finished at 100,000. Lists, ordered lists, and emphasis reached 10,000, then hit the 20-second limit, so they're unproven beyond that.
 - **Recursive walks do overflow.** The spike's validator walked 50,000 levels, but aborted the process at 100,000 on quotes, inline tags, and block tags, and `catch_unwind` can't stop that. A 1 GiB thread contained it for quotes and inline tags. So Expansion, which is recursive and has bigger frames, needs a depth limit, as the design already assumes. Its frames haven't been measured, so the limit should be set well below these numbers.
 - **Parsing is superlinear, and the guard won't stop a slow parse.** This is reported only:
 
@@ -388,7 +388,7 @@ The last different tree is example 91, where a lowercase tag with a multi-line a
 | 256 KB | 0.055s | 0.450s | 0.616s | 1.149s | 2.200s | 13.201s |
 | 1 MB | 0.435s | 8.843s | 13.036s | 27.374s | 42.292s | Over 60s |
 
-Normal documents are well below where this matters, and each file parses separately. A generated table is the likeliest way to hit it: a 256 KB table takes 13 seconds. Liquid loops can generate one, so Spike 5 should keep this in mind. Open PRs target scaling, including [#197](https://github.com/wooorm/markdown-rs/pull/197) and [#238](https://github.com/wooorm/markdown-rs/pull/238). They weren't tested.
+These are for stock 1.0.0, and the fork and the callback barely change them (`results/evaluation/scaling.txt`). Normal documents are well below where this matters, and each file parses separately. A generated table is the likeliest way to hit it: a 256 KB table takes 13 seconds. Liquid loops can generate one, so Spike 5 should keep this in mind. Open PRs target scaling, including [#197](https://github.com/wooorm/markdown-rs/pull/197) and [#238](https://github.com/wooorm/markdown-rs/pull/238). They weren't tested.
 
 **Is the stale crate a practical problem? Yes, but a small fork solves it.** Upstream's last commit is still 2025-04-23, while fixes keep arriving as open PRs. Of the panic PRs reviewed, these six apply cleanly together:
 
@@ -401,7 +401,7 @@ Normal documents are well below where this matters, and each file parses separat
 | [#205](https://github.com/wooorm/markdown-rs/pull/205) | `44542f924d` | List item positions around code |
 | [#207](https://github.com/wooorm/markdown-rs/pull/207) | `d2efc4814c` | Whitespace in link titles and labels |
 
-Together they're 91 lines added and 23 removed across six source files, on `1506572`, with no manifest or `build.rs` changes. Patches are in `results/fork/`, and the commits above reproduce them. #265, #267, and #219 include their tests, and the other three are source only.
+Together they're 91 lines added and 23 removed across six source files, on `1506572`, with no manifest or `build.rs` changes. **The fork is the patches in `results/fork/`, applied in this order, not the PRs.** The commits above are each PR's head, and they don't reproduce the fork on their own: #219's is only a `debug_assert` change, with the fix in its other commit, and #210 and #207 are stacked on other branches, at about 80 commits and 22,000 added lines each. #265, #267, and #219 are whole PRs with their tests, and the other three are only the source file from the commit above.
 
 | 250,000 documents | Stock 1.0.0 | Fork |
 |---|---|---|
@@ -419,10 +419,32 @@ The 5 left share one shape, `to_mdast.rs:1842`, such as `a||`, `-|-`, `1. <`: a 
 
 - The proposed checks: unterminated tags, tables that became paragraphs, and `\|` unescaping. Spike 5 now covers them.
 - Trees that are well formed but wrong. The validator only checks shape and positions.
-- Inputs that take the callback outside the table suite.
 - The other open PRs, such as [#268](https://github.com/wooorm/markdown-rs/pull/268) and [#269](https://github.com/wooorm/markdown-rs/pull/269), which might let the design drop its own list tightness work.
 
 **Worth reporting upstream** (not reported yet): `<A b="AT&T" />` isn't specifically mentioned in #265's title, and a note there would show how ordinary it is. Also a table header followed by a list with an unclosed `<`, which no PR we reviewed covers.
+
+### Evaluation of Spike 2
+
+A separate review (2026-11-02) re-ran the suites, rebuilt the fork from the saved patches, compared those patches with upstream, and tested what the spike left out. Its evidence is in `spikes/02-dialect/results/evaluation/`.
+
+**The results hold, and the fork is still the right call.** Stock and fork both reproduce byte for byte, and the counts above check out. Three new results support them:
+
+- **With the expression callback on**, which is what Stage 3 uses and the spike's robustness runs didn't, the fork still has 5 panics and 0 malformed trees in 250,000 documents.
+- **Scaling** barely changes with the fork or the callback. The spike only measured stock.
+- **The depth claims are true:** quotes parsed 100,000 levels in about 114 seconds and inline tags in about 131, and a recursive walk at that depth aborts the process unless it has a 1 GiB stack. Those runs weren't saved at the time, and `results/record/deep.txt` shows timeouts because it used a 20-second limit. Block tags also finished at 100,000, in about 182 seconds, where the spike had stopped at 50,000.
+
+**What it changed:**
+
+| Problem | Evidence | Change |
+|---|---|---|
+| The commits in ADR 0004 couldn't rebuild the tested fork | `upstream-prs.txt` | The ADR now builds from the saved patches |
+| The ESM check flagged ordinary prose, such as `import duties from China rose sharply` | 5 of 7 new prose lines flagged, in `esm-and-callback.txt` | `from` must be followed by a quote. That still scores 19 of 19 and reports all 8 new statements, and it flags 2 of the 7 prose lines: `export class action lawsuits` and `export default settings are fine` |
+| The recommended `\import` escape printed its backslash | Run through the parser | The escape is now `&#105;mport` |
+| An open quote in an Expression reports its error at the end of the file, and can swallow later blocks | `esm-and-callback.txt` | Proposed handling added to the design, untested, in Spike 5 |
+| Authors weren't told about pipes in table cells, and nothing required the silent failures to become errors | The PRD | Added to R7, and a new R26 |
+| Spike 2's crash controls left core dumps holding the session's environment, including tokens | Ten files, about 48 MB | `spikes/.gitignore` keeps them out of commits, and `spikes/README.md` says to run with `ulimit -c 0` |
+
+**Still open:** the fork's own test suite has never run, and neither has the handling for tags with no `>`, tables that became paragraphs, or open quotes. Those are the likeliest remaining ways to get a wrong PDF.
 
 ## Spike 3: Liquid behavior
 
@@ -506,6 +528,7 @@ The 5 left share one shape, `to_mdast.rs:1842`, such as `a||`, `-|-`, `1. <`: a 
 - Two Components defining the same reference label with different URLs, and a Component with a footnote used twice.
 - A tree with no Markdown form, which must give an error: `[<L />](/c)`, where `L` expands to a link.
 - Spike 2's untested handling: `<Card title="x"` with no `>` must be an error, a table whose header has an unescaped filter pipe must be an error, and `{x \| upcase}` in a cell must reach Liquid as `x | upcase`.
+- `{it's}` must give an error pointing at that Expression, and `{it's} and {don't}` and an Expression containing a blank line must not silently become text.
 - `{/* comment */}` must produce nothing, and a generated 256 KB table must finish or fail clearly.
 - Every remaining row of the known hazards table.
 
@@ -524,4 +547,4 @@ The 5 left share one shape, `to_mdast.rs:1842`, such as `a||`, `-|-`, `1. <`: a 
 1. Record findings above, and update the [technical design](technical-design.md) and [PRD](prd.md).
 2. Write an ADR for the Renderer.
 3. Have a person set performance and size targets from the Spike 4 numbers.
-4. Delete `spikes/`, once Spike 1's suites have moved into the real tests, and start [Milestone 1](technical-design.md#delivery).
+4. Move Spike 1's suites into the real tests, and start [Milestone 1](technical-design.md#delivery). `spikes/` stays as the evidence for these findings.
