@@ -1,6 +1,6 @@
 # Spikes
 
-Short experiments to test the riskiest assumptions in the [technical design](technical-design.md) before building on them. Status as of 2026-11-02: Spike 1 failed, Spike 1b passed every bar except exact output and its recommendations were accepted, Spike 2 passed with required changes and its fork recommendation was accepted, and Spikes 3–5 haven't started.
+Short experiments to test the riskiest assumptions in the [technical design](technical-design.md) before building on them. Status as of 2026-11-02: Spike 1 failed, Spike 1b passed every bar except exact output and its recommendations were accepted, Spike 2 passed with required changes and its fork recommendation was accepted, Spike 3 passed three of its four bars with required changes and its patch recommendation was accepted, and Spikes 4 and 5 haven't started.
 
 ## Ground rules
 
@@ -18,13 +18,13 @@ Short experiments to test the riskiest assumptions in the [technical design](tec
 | [1](#spike-1-markdown-serializer) | Can `mdast_util_to_markdown` round-trip reliably? | 0.5 day | **Failed.** Go to Spike 1b |
 | [1b](#spike-1b-event-based-serializer) | Can `pulldown-cmark-to-cmark` serialize our trees through a small adapter? | 0.5 day | Write our own serializer. **Not needed:** it passed every bar except exact output |
 | [2](#spike-2-dialect-parsing) | Does `markdown` parse the Dialect? | 0.5 day | Work around the gaps, or change parser. **Not needed:** it passed, with required changes |
-| [3](#spike-3-liquid-behavior) | Does `liquid` behave the way the design needs? | 1 day | Custom filters, weaker errors, or a fork |
+| [3](#spike-3-liquid-behavior) | Does `liquid` behave the way the design needs? | 1 day | Custom filters, weaker errors, or a fork. **Mostly:** custom filters and a small patch, with `{% if missing %}` still silent |
 | [4](#spike-4-typst-embedding) | Can Typst embed cleanly and deterministically? | 1–2 days | Try Fulgur |
 | [5](#spike-5-end-to-end-expansion) | Does Expansion work end to end? | 1–2 days | Revisit the expansion design |
 
 Run the remaining spikes in this order:
 
-1. **Spikes 3 and 4** can run in either order.
+1. **Spike 4** comes next.
 2. **Spike 5** comes last, because it needs a working serializer and normalization.
 
 ## Spike 1: Markdown serializer
@@ -475,7 +475,117 @@ A separate review (2026-11-02) re-ran the suites, rebuilt the fork from the save
 
 **If it fails:** Add custom tags or filters, restrict the syntax of Expressions, show rendered snippets in errors, or, for a fundamental gap, patch or fork the crate.
 
-**Findings:** _Not started._
+**Findings (2026-11-02): three bars passed, one partly, with required changes.** `liquid` can do both jobs, but out of the box **it breaks R23 in two ways**, and one of those needs a patch or a restriction. **Decision:** patch it, accepted on 2026-11-02 ([ADR 0005](adr/0005-sort-liquid-object-keys.md)). Numbers are from `spikes/03-liquid/results/`. Two runs of the deterministic suites differ only in one error message's unordered key list, which is itself the second finding below.
+
+| Bar | Result |
+|---|---|
+| Undefined variables reported by name | **Partly.** `{{ }}`, comparisons, `for`, `assign`, and `case` all name it. **`{% if missing %}` is silently false**, as Shopify's default is |
+| Typed values work | **Pass.** 28 of 28, through a capture filter |
+| `{% raw %}` and whitespace control as documented | **Pass, with one limit.** All 5 of Shopify's documented examples match exactly, and raw 7 of 7. Hyphens don't trim tabs |
+| Usable error locations | **Pass.** See below. Most Liquid errors have no line number, so we'd have to supply it |
+
+The table suite had 55 cases with results written in advance, and 52 matched. The 3 surprises are all tabs.
+
+**Two ways it breaks byte-identical output (R23):**
+
+1. **Object order is random per process.** `Object` is a `HashMap` with Rust's seeded hasher, so `{% for kv in obj %}` gave 6 different orders in 6 runs on the same input, and `{{ obj }}` prints in the same random order. There's no option to change it. **Replacing the map with a `BTreeMap` is an 11-line change** (`results/object-order/btreemap.patch`, on published `liquid-core` 0.26.11). It gave the same sorted order in 6 of 6 runs, and the only difference across every suite is that a key list in one error message is now sorted. Keys come out alphabetically rather than in YAML order. `liquid-core`'s own 121 tests pass with it. **The wider `liquid` workspace's tests, which hold the conformance suite, haven't run with it**, because this environment's permission check denied that command. Run them before adopting the patch.
+2. **`"now" | date` reads the clock,** as do `"today"`, `"NOW"`, and `" now "`. Registering our own `date` filter after the standard library replaces the stock one, with no patch. Ours rejects those words and matched the stock filter on the 5 other inputs tried. It's the only clock use we found by searching the crate, and `{% if d < "now" %}` just compares strings.
+
+**Undefined values.** Every name below comes from the crate's message, such as `Unknown variable, requested variable=missing`:
+
+| Template | Result |
+|---|---|
+| `{{ missing }}`, `{{ a.b.c }}` | Error naming the variable |
+| `{{ meta.missing }}`, `{{ obj.missing }}`, `{{ rows[5].name }}` | Error naming the index, listing what's available |
+| `{% if missing == 1 %}`, `{% for i in missing %}`, `{% assign q = missing %}`, `{% case missing %}` | Error naming the variable |
+| **`{% if missing %}`, `{% if obj.missing %}`, `{% unless missing %}`, `{% if missing and b %}`** | **Silent: treated as false** |
+| **`{{ missing \| default: "x" }}`** | **An error** ([#570](https://github.com/cobalt-org/liquid-rust/issues/570), open), where Shopify's would print `x`. `{{ nullvalue \| default: "x" }}` works |
+| `{{ nullvalue }}` | Prints nothing |
+| An unknown filter, wrong filter arguments, an unknown tag | Parse error naming it |
+
+The silent `if` is how authors test optional values, so the working default is to keep it and document it. The cost is that `{% if itmes %}` drops content with no error. Both this and `default` are in the PRD's open questions.
+
+**Typed values.** No public function evaluates an expression, so a `__capture` filter keeps the typed value it receives. `{{ meta.items | __capture }}` and `{% assign __v = meta.items %}{{ __v | __capture }}` both got all 28 right, including arrays, objects, numbers, booleans, null, and `first`. Delimiters inside strings are safe: `{"}}"}` and `{name | append: "}}"}` work.
+
+**Each wrapper can be escaped alone, so a check is needed first.** `"" }}{{ name` gets past the output wrapper, printing nothing with one capture. `name %}{% assign __v = "other"` gets past the assign wrapper. So the design scans for `}}`, `{{`, `%}`, and `{%` outside strings before wrapping. With that scan, neither wrapper accepted any of the 20 attempts, and it wrongly flagged none of the 28 valid Expressions. **Use the scan with the output wrapper,** which is simpler and gives the shorter errors. Parse errors quote the wrapper and count columns from it, so messages should be rewritten to show the author's Expression. As the design guessed, Liquid rejects `{it's} and {don't}` and `{it's}` (`expected Literal`).
+
+**The `attr` filter works.** Through `<Card title="{{ t | attr }}" />`, escaping `&`, `"`, and line endings, all 20,000 random values came back from the Dialect parser exactly, as a block, inline, and in a quote. Without it, 2,923 values came back **silently different** (`&#35;` becomes `#`), 1,551 gave errors, and 938 panicked stock `markdown`. So plain `{{ t }}` in an attribute is worse than the known hazard suggests, and only 14,588 survived.
+
+**YAML to Liquid.** `serde-saphyr` deserializes straight to `liquid::Object`, and it rejects duplicate keys, `.inf`, and `.nan`. Some values change silently, which authors need to know:
+
+| YAML | Becomes | Note |
+|---|---|---|
+| `1.0`, `1.10` | Prints `1`, `1.1` | Quote version numbers |
+| `007` | `7`, typed as fractional | Quote zip codes and IDs |
+| `yes`, `on` | `true` | YAML 1.1 behavior |
+| `99999999999999999999` | Prints `100000000000000000000` | Over `i64`, it loses precision |
+| `2026-01-02` | A date, which prints the same | A full timestamp stays a string |
+| Merge keys, `<<: *b` | Error: `data did not match any variant of untagged enum Value` | Anchors alone work. Needs a better message |
+| A list or text as the whole frontmatter | Error: `expected mapping start`, with a location | Empty frontmatter is an empty map |
+
+**Scope.** `meta.x` and `x` work together. `{% assign x = "Y" %}` changes `x` but not `meta.x`. `{% assign meta = 1 %}` and `{% for meta in xs %}` silently shadow `meta`, because reserved names are only checked in frontmatter. `{% include %}` and `{% render %}` both give `Partial does not exist`, including for `"/etc/passwd"`, so templates can't read files. Assigned and loop variables don't reach Expressions, and the error names them, so `{% assign y = 2 %}{y}` says `requested variable=y`.
+
+**Whitespace.** These spellings keep a block quote together, as checked by the Dialect parser with the condition true and false:
+
+| Spelling | Result |
+|---|---|
+| `> a`, `{% if c %}`, `> b`, `{% endif %}`, `> d` | **3 quotes when true** |
+| `{%- if c -%}` and `{%- endif -%}` | **Glued: one line reading `a> b> d`** |
+| `{%- if c %}` and `{%- endif %}` | **One quote. Recommended** |
+| `{% if c -%}` and `{% endif -%}` | One quote |
+| `> {% if c %}` and `> {% endif %}` | One quote, but split into paragraphs |
+
+A loop works the same way: `{%- for i in xs %}` makes one quote holding a list. **The tab limit:** the grammar's whitespace is only spaces and line endings, so `a\t{%- if x -%}\tb` keeps its tabs, and `{{\tx }}` is a parse error. Shopify's page says "whitespace" without mentioning tabs, and no Ruby Liquid was available to compare with, so this is a likely divergence rather than a confirmed one. CRLF trims correctly, and Stage 1 normalizes it anyway.
+
+**The PRD's example works.** Its `index.mdx` goes through Liquid and the Dialect parser to exactly the expected tree, its Expressions evaluate to `Q3 Report`, and the Component's `props.kind | upcase` to `ALPHA`. This stock `markdown` result doesn't depend on the fork.
+
+**Error locations:**
+
+| Error | Has a line? | What an author gets |
+|---|---|---|
+| Liquid syntax, such as `{% if %}` | **Yes**, line and column in the body, so add the frontmatter's length | A good snippet |
+| An unclosed `{% if %}` | Only the end of the file, not the opening tag | `Unclosed block. {% endif %} tag expected.` |
+| An unknown filter | No | The filter's name |
+| An undefined variable or index | No | The name, plus a trace with the loop's position: `from: {% if true %}`, `from: {% for i in xs %}`, `index=3` |
+| A filter error, such as dividing by zero | No | `filter=divided_by : 0`, `input="abc"` |
+| A bad tag from a loop's third iteration | Dialect line in the rendered text | See below |
+
+**Searching the source for the name in the message** found the right line in all 3 cases with a name in them. With syntax errors' line numbers and filter errors' own text, every one of the 6 cases tested points somewhere usable, though a name used on several lines would give several candidates. The third-iteration case is the one the design worried about, and the rendered snippet does the job:
+
+```text
+index.mdx, after the Liquid Pass, line 8: Unexpected character `"` (U+0022) in attribute name, ...
+    <Card title="th"ree" />
+Line numbers refer to the output of the Liquid Pass.
+```
+
+That's a mock of the message we'd write, and the crate only supplies the parts. The source only has `<Card` on line 4, which a search can also report. The hint in this case should be to use `attr`.
+
+**Exact messages for the known hazards** (for writing hints):
+
+| Input | Message |
+|---|---|
+| `${{ secrets.TOKEN }}` | `Unknown variable`, `requested variable=secrets` |
+| `<A style={{color: "red"}} />` | `expected Literal`, at the `:` |
+| `<A style={{color}} />`, when `color` exists | Prints `style=1`, then the Dialect says `Unexpected character 1 before attribute value` |
+| `{% for i in xs %}<Card title={i.name} />{% endfor %}` | The Liquid Pass succeeds, then `Unknown variable`, `requested variable=i` |
+| `{% sales %}` in prose | `Unknown tag`, `requested=sales`, with a location and the tags available |
+
+**Robustness:**
+
+- **Random templates:** 200,000, with 1 caught panic: `{{ n | minus: 9223372036854775807 | round | divided_by: -1 }}`, at `math.rs:330`. So Stage 2 should sit inside the same guard as Stage 3.
+- **Integer overflow wraps silently:** `{{ 3 | plus: 9223372036854775807 }}` prints a negative number.
+- **Nesting aborts the process on the default stack.** `{% for %}` aborts at 5,000 levels, and `{% if %}`, `{% unless %}`, and `{% capture %}` at 10,000. The abort happens in `parser.parse`, before our code runs anything else, and a guard can't catch it. 2,000 levels are fine for all of them.
+- **A larger stack contains it.** On a 1 GiB thread, all four parse at 10,000 levels and at 100,000, though that takes over 40 seconds and `for` then timed out rendering. Nobody writes 2,000 nested blocks, and Liquid output never goes back through the parser, so only the author's own file can do this. A guarded thread with a large stack is enough.
+- **Other deep shapes are fine:** long paths and filter chains reached 100,000, and 100,000 nested `[a` gives a caught panic at `parser.rs:60`.
+- **Loops are linear and unbounded:** `(1..100000000)` writes 100 MB in 8.3 seconds, which sizes the design's "not a sandbox" note. Memory use wasn't measured.
+
+**Maintenance.** The issues that matter here are old and open: #570 (`default`), [#377](https://github.com/cobalt-org/liquid-rust/issues/377) (whitespace, from 2020). Nothing here suggests anyone's about to change this behavior, which helps a small patch stay small.
+
+**Recommendation: carry the 11-line `liquid-core` patch.** Alternatives are to leave object iteration nondeterministic, breaking R23 for any Project that loops over a map, or to find a way to forbid it. `Object` is also what `{% assign %}` and filters produce, so a custom sorted type for frontmatter wouldn't survive them. `indexmap` would keep YAML order, which authors might prefer, at the cost of a new dependency. It wasn't tested.
+
+**Not tested:** the wider `liquid` test suite with the patch, as above; real Shopify Liquid, for a direct comparison; memory on large loops; Expansion itself, which is Spike 5.
+
+**Worth reporting upstream** (not reported yet): object iteration order, and a sorted map as an option; the `math.rs:330` panic; integer overflow in `plus` and `times`; and a note on #570 that it affects `default` everywhere.
 
 ## Spike 4: Typst embedding
 
@@ -530,6 +640,7 @@ A separate review (2026-11-02) re-ran the suites, rebuilt the fork from the save
 - Spike 2's untested handling: `<Card title="x"` with no `>` must be an error, a table whose header has an unescaped filter pipe must be an error, and `{x \| upcase}` in a cell must reach Liquid as `x | upcase`.
 - `{it's}` must give an error pointing at that Expression, and `{it's} and {don't}` and an Expression containing a blank line must not silently become text.
 - `{/* comment */}` must produce nothing, and a generated 256 KB table must finish or fail clearly.
+- Spike 3's required handling: `"now" | date` must give an error, `{% for kv in obj %}` must print in the same order in every process, an Expression containing `}}` outside a string must be rejected, and a parse error in an Expression must quote the author's text rather than the wrapper.
 - Every remaining row of the known hazards table.
 
 **Pass:**

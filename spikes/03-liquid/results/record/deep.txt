@@ -1,0 +1,58 @@
+label: record
+Timeout 30s per case. Child output shows how far it got.
+
+      if depth    100: parsed 0.001s ⏎ rendered 1 bytes 0.000s ⏎ dropped
+      if depth   1000: parsed 0.008s ⏎ rendered 1 bytes 0.000s ⏎ dropped
+      if depth   2000: parsed 0.013s ⏎ rendered 1 bytes 0.000s ⏎ dropped
+      if depth   5000: parsed 0.075s ⏎ rendered 1 bytes 0.000s ⏎ dropped
+      if depth  10000: ABORT (signal: 6 (SIGABRT)) after:    | 1 GiB stack: parsed 0.261s ⏎ rendered 1 bytes 0.000s ⏎ dropped
+      if depth 100000: ABORT (signal: 6 (SIGABRT)) after:    | 1 GiB stack: parsed 44.221s ⏎ rendered 1 bytes 0.005s ⏎ dropped
+     for depth    100: parsed 0.001s ⏎ rendered 1 bytes 0.000s ⏎ dropped
+     for depth   1000: parsed 0.006s ⏎ rendered 1 bytes 0.002s ⏎ dropped
+     for depth   2000: parsed 0.024s ⏎ rendered 1 bytes 0.005s ⏎ dropped
+     for depth   5000: ABORT (signal: 6 (SIGABRT)) after:    | 1 GiB stack: parsed 0.080s ⏎ rendered 1 bytes 0.034s ⏎ dropped
+     for depth  10000: ABORT (signal: 6 (SIGABRT)) after:    | 1 GiB stack: parsed 0.324s ⏎ rendered 1 bytes 0.162s ⏎ dropped
+     for depth 100000: ABORT (signal: 6 (SIGABRT)) after:    | 1 GiB stack: timeout (over 60s) after: parsed 43.267s
+  unless depth    100: parsed 0.000s ⏎ rendered 1 bytes 0.000s ⏎ dropped
+  unless depth   1000: parsed 0.004s ⏎ rendered 1 bytes 0.000s ⏎ dropped
+  unless depth   2000: parsed 0.020s ⏎ rendered 1 bytes 0.000s ⏎ dropped
+  unless depth   5000: parsed 0.063s ⏎ rendered 1 bytes 0.000s ⏎ dropped
+  unless depth  10000: ABORT (signal: 6 (SIGABRT)) after:    | 1 GiB stack: parsed 0.213s ⏎ rendered 1 bytes 0.000s ⏎ dropped
+  unless depth 100000: ABORT (signal: 6 (SIGABRT)) after:    | 1 GiB stack: parsed 41.065s ⏎ rendered 1 bytes 0.005s ⏎ dropped
+ capture depth    100: parsed 0.000s ⏎ rendered 0 bytes 0.000s ⏎ dropped
+ capture depth   1000: parsed 0.004s ⏎ rendered 0 bytes 0.000s ⏎ dropped
+ capture depth   2000: parsed 0.011s ⏎ rendered 0 bytes 0.000s ⏎ dropped
+ capture depth   5000: parsed 0.068s ⏎ rendered 0 bytes 0.000s ⏎ dropped
+ capture depth  10000: ABORT (signal: 6 (SIGABRT)) after:    | 1 GiB stack: parsed 0.268s ⏎ rendered 0 bytes 0.001s ⏎ dropped
+ capture depth 100000: ABORT (signal: 6 (SIGABRT)) after:    | 1 GiB stack: parsed 44.089s ⏎ rendered 0 bytes 0.007s ⏎ dropped
+    path depth    100: parsed 0.000s ⏎ render error: liquid: Unknown variable ⏎   with: ⏎     requested variable= ⏎ dropped
+    path depth   1000: parsed 0.000s ⏎ render error: liquid: Unknown variable ⏎   with: ⏎     requested variable= ⏎ dropped
+    path depth   2000: parsed 0.000s ⏎ render error: liquid: Unknown variable ⏎   with: ⏎     requested variable= ⏎ dropped
+    path depth   5000: parsed 0.001s ⏎ render error: liquid: Unknown variable ⏎   with: ⏎     requested variable= ⏎ dropped
+    path depth  10000: parsed 0.001s ⏎ render error: liquid: Unknown variable ⏎   with: ⏎     requested variable= ⏎ dropped
+    path depth 100000: parsed 0.027s ⏎ render error: liquid: Unknown variable ⏎   with: ⏎     requested variable= ⏎ dropped
+   index depth    100: parsed 0.000s ⏎ render error: liquid: Unknown variable ⏎   with: ⏎     requested variable= ⏎ dropped
+   index depth   1000: parsed 0.001s ⏎ render error: liquid: Unknown variable ⏎   with: ⏎     requested variable= ⏎ dropped
+   index depth   2000: parsed 0.002s ⏎ render error: liquid: Unknown variable ⏎   with: ⏎     requested variable= ⏎ dropped
+   index depth   5000: parsed 0.010s ⏎ render error: liquid: Unknown variable ⏎   with: ⏎     requested variable= ⏎ dropped
+   index depth  10000: parsed 0.008s ⏎ render error: liquid: Unknown variable ⏎   with: ⏎     requested variable= ⏎ dropped
+   index depth 100000: caught panic in parse at parser.rs:60
+ filters depth    100: parsed 0.000s ⏎ rendered 1 bytes 0.000s ⏎ dropped
+ filters depth   1000: parsed 0.000s ⏎ rendered 1 bytes 0.000s ⏎ dropped
+ filters depth   2000: parsed 0.001s ⏎ rendered 1 bytes 0.000s ⏎ dropped
+ filters depth   5000: parsed 0.002s ⏎ rendered 1 bytes 0.000s ⏎ dropped
+ filters depth  10000: parsed 0.003s ⏎ rendered 1 bytes 0.000s ⏎ dropped
+ filters depth 100000: parsed 0.039s ⏎ rendered 1 bytes 0.004s ⏎ dropped
+
+large loops:
+(1..1000000): 1000000 bytes 0.098s
+(1..10000000): 10000000 bytes 0.798s
+(1..100000000): 100000000 bytes 8.292s
+
+object order across processes, YAML order is zebra,apple,mango,kiwi,fig,lime:
+"lime,mango,fig,zebra,apple,kiwi," (with json: PARSE ERROR: liquid: Unknown filter ⏎   with: ⏎     requested filter=json ⏎     available filters=__capture, abs, append, at_least, at_most, attr, capitalize, ceil, compact, concat, date, default, divided_by, downcase, escape, escape_once, first, floor, join, last, lstrip, map, minus, modulo, newline_to_br, plus, prepend, remove, remove_first, replace, replace_first, reverse, round, rstrip, size, slice, sort, sort_natural, split, strip, strip_html, strip_newlines, times, truncate, truncatewords, uniq, upcase, url_decode, url_encode, where)
+"zebra,mango,kiwi,fig,lime,apple," (with json: PARSE ERROR: liquid: Unknown filter ⏎   with: ⏎     requested filter=json ⏎     available filters=__capture, abs, append, at_least, at_most, attr, capitalize, ceil, compact, concat, date, default, divided_by, downcase, escape, escape_once, first, floor, join, last, lstrip, map, minus, modulo, newline_to_br, plus, prepend, remove, remove_first, replace, replace_first, reverse, round, rstrip, size, slice, sort, sort_natural, split, strip, strip_html, strip_newlines, times, truncate, truncatewords, uniq, upcase, url_decode, url_encode, where)
+"zebra,kiwi,fig,lime,mango,apple," (with json: PARSE ERROR: liquid: Unknown filter ⏎   with: ⏎     requested filter=json ⏎     available filters=__capture, abs, append, at_least, at_most, attr, capitalize, ceil, compact, concat, date, default, divided_by, downcase, escape, escape_once, first, floor, join, last, lstrip, map, minus, modulo, newline_to_br, plus, prepend, remove, remove_first, replace, replace_first, reverse, round, rstrip, size, slice, sort, sort_natural, split, strip, strip_html, strip_newlines, times, truncate, truncatewords, uniq, upcase, url_decode, url_encode, where)
+"apple,fig,zebra,kiwi,mango,lime," (with json: PARSE ERROR: liquid: Unknown filter ⏎   with: ⏎     requested filter=json ⏎     available filters=__capture, abs, append, at_least, at_most, attr, capitalize, ceil, compact, concat, date, default, divided_by, downcase, escape, escape_once, first, floor, join, last, lstrip, map, minus, modulo, newline_to_br, plus, prepend, remove, remove_first, replace, replace_first, reverse, round, rstrip, size, slice, sort, sort_natural, split, strip, strip_html, strip_newlines, times, truncate, truncatewords, uniq, upcase, url_decode, url_encode, where)
+"zebra,apple,kiwi,fig,lime,mango," (with json: PARSE ERROR: liquid: Unknown filter ⏎   with: ⏎     requested filter=json ⏎     available filters=__capture, abs, append, at_least, at_most, attr, capitalize, ceil, compact, concat, date, default, divided_by, downcase, escape, escape_once, first, floor, join, last, lstrip, map, minus, modulo, newline_to_br, plus, prepend, remove, remove_first, replace, replace_first, reverse, round, rstrip, size, slice, sort, sort_natural, split, strip, strip_html, strip_newlines, times, truncate, truncatewords, uniq, upcase, url_decode, url_encode, where)
+"fig,zebra,mango,apple,kiwi,lime," (with json: PARSE ERROR: liquid: Unknown filter ⏎   with: ⏎     requested filter=json ⏎     available filters=__capture, abs, append, at_least, at_most, attr, capitalize, ceil, compact, concat, date, default, divided_by, downcase, escape, escape_once, first, floor, join, last, lstrip, map, minus, modulo, newline_to_br, plus, prepend, remove, remove_first, replace, replace_first, reverse, round, rstrip, size, slice, sort, sort_natural, split, strip, strip_html, strip_newlines, times, truncate, truncatewords, uniq, upcase, url_decode, url_encode, where)

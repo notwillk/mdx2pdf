@@ -194,6 +194,8 @@ Each has a working default, used until someone decides otherwise.
 | Can Components read the Entry Document's frontmatter? | No, pass values through Props |
 | `{/* comment */}`, which MDX authors expect | Accept it as a comment |
 | Namespaced Components such as `<Ns.Sub />` | Later |
+| `{% if missing %}` with an undefined name, including a typo | Treat it as false, which is how authors test optional values and what Shopify does by default, though a typo drops content silently |
+| `{{ missing \| default: "x" }}`, which is an error in `liquid` but prints `x` in Shopify's | Leave it as an error, with a hint to use `{% if %}` |
 | Bare URLs such as `https://a.b`, which GFM can turn into links | Print as plain text. Literal autolinks are off in both the Dialect and Markdown, so authors write `[text](url)` for a link |
 | Fonts beyond the bundled ones | Load them from a `fonts/` directory in the Project. Never system fonts, because they'd break R23 |
 | Performance and binary-size targets | Spike 4 measures them, then a person sets the bar |

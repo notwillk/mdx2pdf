@@ -1,0 +1,47 @@
+diff --git a/src/model/object/map.rs b/src/model/object/map.rs
+index 801c45f..bf48f33 100644
+--- a/src/model/object/map.rs
++++ b/src/model/object/map.rs
+@@ -1,7 +1,7 @@
+ //! Type representing a Liquid object, payload of the `Value::Object` variant
+ 
+ use std::borrow::Borrow;
+-use std::collections::hash_map;
++use std::collections::btree_map;
+ use std::fmt::{self, Debug};
+ use std::hash::Hash;
+ use std::iter::FromIterator;
+@@ -19,15 +19,15 @@ pub struct Object {
+ 
+ type Key = crate::model::KString;
+ 
+-type MapImpl<K, V> = hash_map::HashMap<K, V>;
+-type VacantEntryImpl<'a> = hash_map::VacantEntry<'a, Key, Value>;
+-type OccupiedEntryImpl<'a> = hash_map::OccupiedEntry<'a, Key, Value>;
+-type IterImpl<'a> = hash_map::Iter<'a, Key, Value>;
+-type IterMutImpl<'a> = hash_map::IterMut<'a, Key, Value>;
+-type IntoIterImpl = hash_map::IntoIter<Key, Value>;
+-type KeysImpl<'a> = hash_map::Keys<'a, Key, Value>;
+-type ValuesImpl<'a> = hash_map::Values<'a, Key, Value>;
+-type ValuesMutImpl<'a> = hash_map::ValuesMut<'a, Key, Value>;
++type MapImpl<K, V> = btree_map::BTreeMap<K, V>;
++type VacantEntryImpl<'a> = btree_map::VacantEntry<'a, Key, Value>;
++type OccupiedEntryImpl<'a> = btree_map::OccupiedEntry<'a, Key, Value>;
++type IterImpl<'a> = btree_map::Iter<'a, Key, Value>;
++type IterMutImpl<'a> = btree_map::IterMut<'a, Key, Value>;
++type IntoIterImpl = btree_map::IntoIter<Key, Value>;
++type KeysImpl<'a> = btree_map::Keys<'a, Key, Value>;
++type ValuesImpl<'a> = btree_map::Values<'a, Key, Value>;
++type ValuesMutImpl<'a> = btree_map::ValuesMut<'a, Key, Value>;
+ 
+ impl Object {
+     /// Makes a new empty Object.
+@@ -114,7 +114,7 @@ impl Object {
+     where
+         S: Into<Key>,
+     {
+-        use std::collections::hash_map::Entry as EntryImpl;
++        use std::collections::btree_map::Entry as EntryImpl;
+         match self.map.entry(key.into()) {
+             EntryImpl::Vacant(vacant) => Entry::Vacant(VacantEntry { vacant }),
+             EntryImpl::Occupied(occupied) => Entry::Occupied(OccupiedEntry { occupied }),

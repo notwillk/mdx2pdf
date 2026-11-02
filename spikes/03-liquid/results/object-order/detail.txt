@@ -1,0 +1,110 @@
+[undefined] "{{ missing }}"
+  RENDER ERROR: liquid: Unknown variable ⏎   with: ⏎     requested variable=missing
+[undefined] "{{ a.b.c }}"
+  RENDER ERROR: liquid: Unknown variable ⏎   with: ⏎     requested variable=a
+[undefined] "{{ meta.missing }}"
+  RENDER ERROR: liquid: Unknown index ⏎   with: ⏎     variable=meta ⏎     requested index=missing ⏎     available indexes=b, f, items, n, name, obj, rows, x, z
+[undefined] "{{ obj.missing }}"
+  RENDER ERROR: liquid: Unknown index ⏎   with: ⏎     variable=obj ⏎     requested index=missing ⏎     available indexes=k
+[undefined] "{{ rows[5].name }}"
+  RENDER ERROR: liquid: Unknown index ⏎   with: ⏎     variable=rows ⏎     requested index=5 ⏎     available indexes=0..1, first, last
+[undefined] "{{ missing | default: \"x\" }}"
+  RENDER ERROR: liquid: Unknown variable ⏎   with: ⏎     requested variable=missing
+[undefined] "{{ z | default: \"x\" }}"
+  "x"
+[undefined] "[{{ z }}]"
+  "[]"
+[undefined] "{% if missing %}y{% else %}n{% endif %}"
+  "n"
+[undefined] "{% if obj.missing %}y{% else %}n{% endif %}"
+  "n"
+[undefined] "{% unless missing %}y{% endunless %}"
+  "y"
+[undefined] "{% if missing == 1 %}y{% else %}n{% endif %}"
+  RENDER ERROR: liquid: Unknown variable ⏎   with: ⏎     requested variable=missing ⏎ from: {% if missing == 1 %}
+[undefined] "{% if missing and b %}y{% else %}n{% endif %}"
+  "n"
+[undefined] "{% for i in missing %}y{% endfor %}"
+  RENDER ERROR: liquid: Unknown variable ⏎   with: ⏎     requested variable=missing ⏎ from: {% for i in missing  %}
+[undefined] "{% assign q = missing %}"
+  RENDER ERROR: liquid: Unknown variable ⏎   with: ⏎     requested variable=missing ⏎ from: {% assign q = missing | %}
+[undefined] "{% case missing %}{% when 1 %}y{% endcase %}"
+  RENDER ERROR: liquid: Unknown variable ⏎   with: ⏎     requested variable=missing
+[undefined] "{{ x | nosuchfilter }}"
+  PARSE ERROR: liquid: Unknown filter ⏎   with: ⏎     requested filter=nosuchfilter ⏎     available filters=__capture, abs, append, at_least, at_most, attr, capitalize, ceil, compact, concat, date, default, divided_by, downcase, escape, escape_once, first, floor, join, last, lstrip, map, minus, modulo, newline_to_br, plus, prepend, remove, remove_first, replace, replace_first, reverse, round, rstrip, size, slice, sort, sort_natural, split, strip, strip_html, strip_newlines, times, truncate, truncatewords, uniq, upcase, url_decode, url_encode, where
+[undefined] "{{ x | replace }}"
+  PARSE ERROR: liquid: Invalid number of arguments ⏎   with: ⏎     cause=expected at least 1 positional argument ⏎ from: Filter parsing error ⏎   with: ⏎     filter=replace
+[undefined] "{{ x | upcase: 1 }}"
+  PARSE ERROR: liquid: Invalid number of positional arguments ⏎   with: ⏎     cause=expected at most 0 positional arguments ⏎ from: Filter parsing error ⏎   with: ⏎     filter=upcase: 1
+[undefined] "{% nosuchtag %}"
+  PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {% nosuchtag %} ⏎   |    ^-------^ ⏎   | ⏎   = Unknown tag. ⏎   with: ⏎     requested=nosuchtag ⏎     available tags=assign, break, continue, cycle, decrement, include, increment, render ⏎     available blocks=capture, case, comment, for, if, ifchanged, raw, tablerow, unless
+[undefined] "{{ x"
+  PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {{ x ⏎   |    ^--- ⏎   | ⏎   = expected Literal
+[undefined] "{% if x %}"
+  PARSE ERROR: liquid:  --> 1:11 ⏎   | ⏎ 1 |  ⏎   | ^ ⏎   | ⏎   = Unclosed block. {% endif %} tag expected.
+[shopify] "{% assign my_variable = \"tomato\" %}\n{{ my_variable }}"
+  "\ntomato"
+[shopify] "{% assign my_variable = \"tomato\" -%}\n{{ my_variable }}"
+  "tomato"
+[shopify] "{% assign username = \"John G. Chalmers-Smith\" %}\n{% if username and username.size > 10 %}\n  Wow, {{ username }} , you have a long name!\n{% else %}\n  Hello there!\n{% endif %}"
+  "\n\n  Wow, John G. Chalmers-Smith , you have a long name!\n"
+[shopify] "{% assign username = \"John G. Chalmers-Smith\" -%}\n{%- if username and username.size > 10 -%}\n  Wow, {{ username -}} , you have a long name!\n{%- else -%}\n  Hello there!\n{%- endif %}"
+  "Wow, John G. Chalmers-Smith, you have a long name!"
+[shopify] "{% raw %}\nIn Handlebars, {{ this }} will be HTML-escaped, but {{{ that }}} will not.\n{% endraw %}"
+  "\nIn Handlebars, {{ this }} will be HTML-escaped, but {{{ that }}} will not.\n"
+[shopify] "a\t{%- if true -%}\tb{% endif %}"
+  "a\t\tb"
+[shopify] "a\t{{- x -}}\tb"
+  "a\tX\tb"
+[shopify] "a\r\n{%- if true -%}\r\nb{% endif %}"
+  "ab"
+[shopify] "a  \n  {%- if true -%}  \n  b{% endif %}"
+  "ab"
+[shopify] "{{\tx\t}}"
+  PARSE ERROR: liquid:  --> 1:3 ⏎   | ⏎ 1 | {{	x	}} ⏎   |   ^--- ⏎   | ⏎   = expected Value
+[shopify] "{%\nif true\n%}y{%\nendif\n%}"
+  "y"
+[shopify] "{{\nx\n}}"
+  "X"
+[whitespace] "> a\n{%- if b -%}\n> c\n{%- endif -%}\n> d\n"
+  "> a> c> d\n"
+[whitespace] "> a\n{%- if b %}\n> c\n{%- endif %}\n> d\n"
+  "> a\n> c\n> d\n"
+[whitespace] "> a\n{% if b %}\n> c\n{% endif %}\n> d\n"
+  "> a\n\n> c\n\n> d\n"
+[raw] "```\n{% raw %}${{ secrets.TOKEN }}{% endraw %}\n```\n"
+  "```\n${{ secrets.TOKEN }}\n```\n"
+[raw] "{% raw %}{{ unclosed{% endraw %}"
+  "{{ unclosed"
+[raw] "{% raw %}{% if %}{% endraw %}"
+  "{% if %}"
+[raw] "{% raw %}{{ a }}{% endraw %} and {{ x }}"
+  "{{ a }} and X"
+[raw] "{% raw %}"
+  PARSE ERROR: liquid:  --> 1:10 ⏎   | ⏎ 1 |  ⏎   | ^ ⏎   | ⏎   = Unclosed block. {% endraw %} tag expected.
+[raw] "{% endraw %}"
+  PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {% endraw %} ⏎   |    ^----^ ⏎   | ⏎   = Unknown tag. ⏎   with: ⏎     requested=endraw ⏎     available tags=assign, break, continue, cycle, decrement, include, increment, render ⏎     available blocks=capture, case, comment, for, if, ifchanged, raw, tablerow, unless
+[raw] "{% comment %}{{ missing }}{% endcomment %}"
+  ""
+[single brace] "{props.name | upcase}"
+  "{props.name | upcase}"
+[single brace] "{ {{ x }} }"
+  "{ X }"
+[single brace] "<A b={x} c=\"{{ x }}\" />"
+  "<A b={x} c=\"X\" />"
+[single brace] "{% for i in items %}{i}{% endfor %}"
+  "{i}{i}"
+[scope] "{{ meta.x }}{{ x }}"
+  "XX"
+[scope] "{% assign x = \"Y\" %}{{ x }}{{ meta.x }}"
+  "YX"
+[scope] "{% assign meta = 1 %}{{ meta }}"
+  "1"
+[scope] "{% for meta in items %}{{ meta }}{% endfor %}{{ meta.x }}"
+  "abX"
+[scope] "{% include \"x\" %}"
+  RENDER ERROR: liquid: Partial does not exist ⏎   with: ⏎     name=x ⏎ from: {% include "x" %}
+[scope] "{% include \"/etc/passwd\" %}"
+  RENDER ERROR: liquid: Partial does not exist ⏎   with: ⏎     name=/etc/passwd ⏎ from: {% include "/etc/passwd" %}
+[scope] "{% render \"x\" %}"
+  RENDER ERROR: liquid: Partial does not exist ⏎   with: ⏎     name=x.liquid ⏎ from: {% render "x" %}

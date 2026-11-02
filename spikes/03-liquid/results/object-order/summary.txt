@@ -1,0 +1,319 @@
+label: object-order
+
+table: 55 cases, 3 surprises
+  raw: 7/7
+  scope: 7/7
+  shopify: 9/12
+  single brace: 4/4
+  undefined: 22/22
+  whitespace: 3/3
+  SURPRISE [shopify] "a\t{%- if true -%}\tb{% endif %}"
+    expected "ab"
+    actual   "a\t\tb"
+  SURPRISE [shopify] "a\t{{- x -}}\tb"
+    expected "aXb"
+    actual   "a\tX\tb"
+  SURPRISE [shopify] "{{\tx\t}}"
+    expected "X"
+    actual   PARSE ERROR: liquid:  --> 1:3 ⏎   | ⏎ 1 | {{	x	}} ⏎   |   ^--- ⏎   | ⏎   = expected Value
+
+undefined values, what each one does:
+  "{{ missing }}"
+    RENDER ERROR: liquid: Unknown variable ⏎   with: ⏎     requested variable=missing
+  "{{ a.b.c }}"
+    RENDER ERROR: liquid: Unknown variable ⏎   with: ⏎     requested variable=a
+  "{{ meta.missing }}"
+    RENDER ERROR: liquid: Unknown index ⏎   with: ⏎     variable=meta ⏎     requested index=missing ⏎     available indexes=b, f, items, n, name, obj, rows, x, z
+  "{{ obj.missing }}"
+    RENDER ERROR: liquid: Unknown index ⏎   with: ⏎     variable=obj ⏎     requested index=missing ⏎     available indexes=k
+  "{{ rows[5].name }}"
+    RENDER ERROR: liquid: Unknown index ⏎   with: ⏎     variable=rows ⏎     requested index=5 ⏎     available indexes=0..1, first, last
+  "{{ missing | default: \"x\" }}"
+    RENDER ERROR: liquid: Unknown variable ⏎   with: ⏎     requested variable=missing
+  "{{ z | default: \"x\" }}"
+    "x"
+  "[{{ z }}]"
+    "[]"
+  "{% if missing %}y{% else %}n{% endif %}"
+    "n"
+  "{% if obj.missing %}y{% else %}n{% endif %}"
+    "n"
+  "{% unless missing %}y{% endunless %}"
+    "y"
+  "{% if missing == 1 %}y{% else %}n{% endif %}"
+    RENDER ERROR: liquid: Unknown variable ⏎   with: ⏎     requested variable=missing ⏎ from: {% if missing == 1 %}
+  "{% if missing and b %}y{% else %}n{% endif %}"
+    "n"
+  "{% for i in missing %}y{% endfor %}"
+    RENDER ERROR: liquid: Unknown variable ⏎   with: ⏎     requested variable=missing ⏎ from: {% for i in missing  %}
+  "{% assign q = missing %}"
+    RENDER ERROR: liquid: Unknown variable ⏎   with: ⏎     requested variable=missing ⏎ from: {% assign q = missing | %}
+  "{% case missing %}{% when 1 %}y{% endcase %}"
+    RENDER ERROR: liquid: Unknown variable ⏎   with: ⏎     requested variable=missing
+  "{{ x | nosuchfilter }}"
+    PARSE ERROR: liquid: Unknown filter ⏎   with: ⏎     requested filter=nosuchfilter ⏎     available filters=__capture, abs, append, at_least, at_most, attr, capitalize, ceil, compact, concat, date, default, divided_by, downcase, escape, escape_once, first, floor, join, last, lstrip, map, minus, modulo, newline_to_br, plus, prepend, remove, remove_first, replace, replace_first, reverse, round, rstrip, size, slice, sort, sort_natural, split, strip, strip_html, strip_newlines, times, truncate, truncatewords, uniq, upcase, url_decode, url_encode, where
+  "{{ x | replace }}"
+    PARSE ERROR: liquid: Invalid number of arguments ⏎   with: ⏎     cause=expected at least 1 positional argument ⏎ from: Filter parsing error ⏎   with: ⏎     filter=replace
+  "{{ x | upcase: 1 }}"
+    PARSE ERROR: liquid: Invalid number of positional arguments ⏎   with: ⏎     cause=expected at most 0 positional arguments ⏎ from: Filter parsing error ⏎   with: ⏎     filter=upcase: 1
+  "{% nosuchtag %}"
+    PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {% nosuchtag %} ⏎   |    ^-------^ ⏎   | ⏎   = Unknown tag. ⏎   with: ⏎     requested=nosuchtag ⏎     available tags=assign, break, continue, cycle, decrement, include, increment, render ⏎     available blocks=capture, case, comment, for, if, ifchanged, raw, tablerow, unless
+  "{{ x"
+    PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {{ x ⏎   |    ^--- ⏎   | ⏎   = expected Literal
+  "{% if x %}"
+    PARSE ERROR: liquid:  --> 1:11 ⏎   | ⏎ 1 |  ⏎   | ^ ⏎   | ⏎   = Unclosed block. {% endif %} tag expected.
+
+typed values:
+  of 28: output capture 28, assign capture 28
+
+text that tries to escape its wrapper:
+  "name }} leak {{ name"  pre-check flags it: true
+    output rejected (rejected: printed "alice leak ")
+    assign rejected (PARSE ERROR: liquid:  --> 1:22 ⏎   | ⏎ 1 | {% assign __v = name }} lea)
+  "name }}{{ name"  pre-check flags it: true
+    output rejected (rejected: printed "alice")
+    assign rejected (PARSE ERROR: liquid:  --> 1:22 ⏎   | ⏎ 1 | {% assign __v = name }}{{ n)
+  "\"\" }}{{ name"  pre-check flags it: true
+    output ACCEPTED string:alice
+    assign rejected (PARSE ERROR: liquid:  --> 1:20 ⏎   | ⏎ 1 | {% assign __v = "" }}{{ nam)
+  "\"\" }}{% assign name = \"changed\" %}{{ name"  pre-check flags it: true
+    output ACCEPTED string:changed
+    assign rejected (PARSE ERROR: liquid:  --> 1:20 ⏎   | ⏎ 1 | {% assign __v = "" }}{% ass)
+  "name | upcase }}{{ name | upcase"  pre-check flags it: true
+    output rejected (rejected: printed "ALICE")
+    assign rejected (PARSE ERROR: liquid:  --> 1:31 ⏎   | ⏎ 1 | {% assign __v = name | upca)
+  "name %}"  pre-check flags it: true
+    output rejected (PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {{ name %} | __capture }} ⏎ )
+    assign rejected (rejected: printed " %}")
+  "{% if true %}"  pre-check flags it: true
+    output rejected (PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {{ {% if true %} | __capture)
+    assign rejected (PARSE ERROR: liquid:  --> 1:17 ⏎   | ⏎ 1 | {% assign __v = {% if true )
+  "{{ name }}"  pre-check flags it: true
+    output rejected (PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {{ {{ name }} | __capture }})
+    assign rejected (PARSE ERROR: liquid:  --> 1:17 ⏎   | ⏎ 1 | {% assign __v = {{ name }} )
+  "name }}{% include \"x\" %}{{ name"  pre-check flags it: true
+    output rejected (RENDER ERROR: liquid: Partial does not exist ⏎   with: ⏎     name=x ⏎ )
+    assign rejected (PARSE ERROR: liquid:  --> 1:22 ⏎   | ⏎ 1 | {% assign __v = name }}{% i)
+  ""  pre-check flags it: false
+    output rejected (PARSE ERROR: liquid:  --> 1:5 ⏎   | ⏎ 1 | {{  | __capture }} ⏎   |    )
+    assign rejected (PARSE ERROR: liquid:  --> 1:16 ⏎   | ⏎ 1 | {% assign __v =  %}{{ __v |)
+  "   "  pre-check flags it: false
+    output rejected (PARSE ERROR: liquid:  --> 1:8 ⏎   | ⏎ 1 | {{     | __capture }} ⏎   | )
+    assign rejected (PARSE ERROR: liquid:  --> 1:16 ⏎   | ⏎ 1 | {% assign __v =     %}{{ __)
+  "name name"  pre-check flags it: false
+    output rejected (PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {{ name name | __capture }} )
+    assign rejected (PARSE ERROR: liquid:  --> 1:22 ⏎   | ⏎ 1 | {% assign __v = name name %)
+  "name |"  pre-check flags it: false
+    output rejected (PARSE ERROR: liquid:  --> 1:11 ⏎   | ⏎ 1 | {{ name | | __capture }} ⏎ )
+    assign rejected (PARSE ERROR: liquid:  --> 1:24 ⏎   | ⏎ 1 | {% assign __v = name | %}{{)
+  "| upcase"  pre-check flags it: false
+    output rejected (PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {{ | upcase | __capture }} ⏎)
+    assign rejected (PARSE ERROR: liquid:  --> 1:17 ⏎   | ⏎ 1 | {% assign __v = | upcase %})
+  "name %}{% assign __v = \"other\""  pre-check flags it: true
+    output rejected (PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {{ name %}{% assign __v = "o)
+    assign ACCEPTED string:other
+  "\"\" %}{% assign __v = name"  pre-check flags it: true
+    output rejected (PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {{ "" %}{% assign __v = name)
+    assign ACCEPTED string:alice
+  "'x' }}{{ name"  pre-check flags it: true
+    output rejected (rejected: printed "x")
+    assign rejected (PARSE ERROR: liquid:  --> 1:21 ⏎   | ⏎ 1 | {% assign __v = 'x' }}{{ na)
+  "name ' }}{{ name '"  pre-check flags it: false
+    output rejected (PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {{ name ' }}{{ name ' | __ca)
+    assign rejected (PARSE ERROR: liquid:  --> 1:22 ⏎   | ⏎ 1 | {% assign __v = name ' }}{{)
+  "name \" }}{{ name \""  pre-check flags it: false
+    output rejected (PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {{ name " }}{{ name " | __ca)
+    assign rejected (PARSE ERROR: liquid:  --> 1:22 ⏎   | ⏎ 1 | {% assign __v = name " }}{{)
+  "\"a\" | append: \"}}\" }}{{ name"  pre-check flags it: true
+    output rejected (rejected: printed "a}}")
+    assign rejected (PARSE ERROR: liquid:  --> 1:36 ⏎   | ⏎ 1 | {% assign __v = "a" | appen)
+  of 20 attempts, accepted: output 2, assign 2, pre-check plus output 0, pre-check plus assign 0
+  valid typed Expressions the pre-check wrongly flags: 0 of 28
+
+attr filter round trip through the Dialect, 20,000 random values:
+   20000 attr flow: same
+   20000 attr in quote: same
+   20000 attr text: same
+    1551 no filter: dialect error  first: "{{-=/\"&b"
+     938 no filter: dialect panic  first: "]AT&T"
+    2923 no filter: different value  first: "&#35;"
+   14588 no filter: same
+
+yaml through serde-saphyr to liquid values:
+  "a: {b: {c: [1, {d: e}]}}\n"
+    a = {b:{c:[whole number:1,{d:string:e}]}} prints "bc1de"
+  "i: 3\n"
+    i = whole number:3 prints "3"
+  "i: -3\n"
+    i = whole number:-3 prints "-3"
+  "f: 1.0\n"
+    f = fractional number:1 prints "1"
+  "f: 1.50\n"
+    f = fractional number:1.5 prints "1.5"
+  "f: 1e3\n"
+    f = fractional number:1000 prints "1000"
+  "big: 9223372036854775807\n"
+    big = whole number:9223372036854775807 prints "9223372036854775807"
+  "big: 99999999999999999999\n"
+    big = fractional number:100000000000000000000 prints "100000000000000000000"
+  "inf: .inf\n"
+    ERROR error: line 1 column 6: non-finite float `.inf` rejected by the configured policy ⏎  --> <input>:1:6 ⏎   | ⏎ 1 | inf: .inf ⏎   |      ^ non-finite flo
+  "nan: .nan\n"
+    ERROR error: line 1 column 6: non-finite float `.nan` rejected by the configured policy ⏎  --> <input>:1:6 ⏎   | ⏎ 1 | nan: .nan ⏎   |      ^ non-finite flo
+  "t: true\n"
+    t = boolean:true prints "true"
+  "t: yes\n"
+    t = boolean:true prints "true"
+  "t: on\n"
+    t = boolean:true prints "true"
+  "n: null\n"
+    n = nil prints ""
+  "n: ~\n"
+    n = nil prints ""
+  "n:\n"
+    n = nil prints ""
+  "d: 2026-01-02\n"
+    d = date:2026-01-02 prints "2026-01-02"
+  "d: 2026-01-02T03:04:05Z\n"
+    d = string:2026-01-02T03:04:05Z prints "2026-01-02T03:04:05Z"
+  "s: \"quoted\"\n"
+    s = string:quoted prints "quoted"
+  "s: |\n  block\n  text\n"
+    s = string:block
+text
+ prints "block\ntext\n"
+  "s: 007\n"
+    s = fractional number:7 prints "7"
+  "base: &b {x: 1}\nref: *b\n"
+    base = {x:whole number:1} prints "x1"; ref = {x:whole number:1} prints "x1"
+  "base: &b {x: 1}\nm:\n  <<: *b\n  y: 2\n"
+    ERROR error: line 3 column 3: data did not match any variant of untagged enum Value ⏎  --> <input>:3:3 ⏎   | ⏎ 1 | base: &b {x: 1} ⏎ 2 | m: ⏎ 3 |   <<: *b ⏎
+  "1: a\n"
+    1 = string:a prints "a"
+  "true: a\n"
+    true = string:a prints "a"
+  "my-key: a\n"
+    my-key = string:a prints "a"
+  "a: 1\na: 2\n"
+    ERROR error: line 2 column 1: duplicate mapping key: a, set DuplicateKeyPolicy in Options if acceptable ⏎  --> <input>:2:1 ⏎   | ⏎ 1 | a: 1 ⏎ 2 | a: 2 ⏎   |
+  "- not\n- a map\n"
+    ERROR error: line 1 column 1: expected mapping start ⏎  --> <input>:1:1 ⏎   | ⏎ 1 | - not ⏎   | ^ expected mapping start ⏎ 2 | - a map ⏎   |
+  "just text\n"
+    ERROR error: line 1 column 1: expected mapping start ⏎  --> <input>:1:1 ⏎   | ⏎ 1 | just text ⏎   | ^ expected mapping start
+  ""
+    
+  "# only a comment\n"
+    
+  "a: [1\n"
+    ERROR error: line 1 column 4: unclosed bracket '[' ⏎  --> <input>:1:4 ⏎   | ⏎ 1 | a: [1 ⏎   |    ^ unclosed bracket '['
+  "a: *missing\n"
+    ERROR error: line 1 column 4: alias references unknown anchor ⏎  --> <input>:1:4 ⏎   | ⏎ 1 | a: *missing ⏎   |    ^ alias references unknown anchor
+
+blockquote spellings, c true and false:
+  no trimming:
+    c=true: "> a\n\n> b\n\n> d\n" -> 3 quote(s) Root[Q[P[T("a")]],Q[P[T("b")]],Q[P[T("d")]]]
+    c=false: "> a\n\n> d\n" -> 2 quote(s) Root[Q[P[T("a")]],Q[P[T("d")]]]
+  trim both sides:
+    c=true: "> a> b> d\n" -> 1 quote(s) Root[Q[P[T("a> b> d")]]]
+    c=false: "> a> d\n" -> 1 quote(s) Root[Q[P[T("a> d")]]]
+  trim left only:
+    c=true: "> a\n> b\n> d\n" -> 1 quote(s) Root[Q[P[T("a\nb\nd")]]]
+    c=false: "> a\n> d\n" -> 1 quote(s) Root[Q[P[T("a\nd")]]]
+  trim right only:
+    c=true: "> a\n> b\n> d\n" -> 1 quote(s) Root[Q[P[T("a\nb\nd")]]]
+    c=false: "> a\n> d\n" -> 1 quote(s) Root[Q[P[T("a\nd")]]]
+  same line:
+    c=true: "> a\n> b\n> d\n" -> 1 quote(s) Root[Q[P[T("a\nb\nd")]]]
+    c=false: "> a\n> d\n" -> 1 quote(s) Root[Q[P[T("a\nd")]]]
+  prefix on tag lines:
+    c=true: "> a\n> \n> b\n> \n> d\n" -> 1 quote(s) Root[Q[P[T("a")],P[T("b")],P[T("d")]]]
+    c=false: "> a\n> \n> d\n" -> 1 quote(s) Root[Q[P[T("a")],P[T("d")]]]
+  loop in a quote: "> Items:\n> - a\n> - b\n" -> Root[Q[P[T("Items:")],List]]
+
+prd example:
+  index matches the expected tree: true
+  Root[H1[ExprT("meta.title")],JsxF(Callout kind="Alpha")[P[T("Review "),Strong[T("Alpha")],T(" before "),ExprT("meta.title"),T(" ships.")]],JsxF(Callout kind="Beta")[P[T("Review "),Strong[T("Beta")],T(" before "),ExprT("meta.title"),T(" ships.")]]]
+  its Expressions evaluate to: ["string:Q3 Report", "string:Q3 Report", "string:Q3 Report"]
+  component matches the expected tree: true
+  Root[Q[P[Strong[ExprT("props.kind | upcase")]],JsxF(Content)]]
+  props.kind | upcase evaluates to: Ok("string:ALPHA")
+
+known hazards, exact messages:
+  secrets in a fence: "```yaml\nrun: echo ${{ secrets.TOKEN }}\n```\n"
+    liquid: RENDER ERROR: liquid: Unknown variable ⏎   with: ⏎     requested variable=secrets
+  company with a tag-like value: "{{ company }}\n"
+    liquid: "A<B\n"
+    dialect: Root[P[T("A<B")]]
+  company with a tag-like value and more: "{{ company }}\n"
+    liquid: "A<B, C\n"
+    dialect: DIALECT ERROR at Some(1):Some(4): Unexpected character `,` (U+002C) in name, expected a name character such as letters, digits, `$`, or `_`; whitespace before attributes; or the end of the tag
+  quote in an attribute: "<Card title=\"{{ t }}\" />\n"
+    liquid: "<Card title=\"Say \"hi\"\" />\n"
+    dialect: DIALECT ERROR at Some(1):Some(21): Unexpected character `"` (U+0022) in attribute name, expected an attribute name character such as letters, digits, `$`, or `_`; `=` to initialize a value; whitespace before attributes; or the end of the tag
+  loop variable in an Expression: "{% for i in xs %}<Card title={i.name} />{% endfor %}\n"
+    liquid: "<Card title={i.name} />\n"
+    dialect: Root[JsxF(Card title={i.name})]
+    expression "i.name": RENDER ERROR: liquid: Unknown variable ⏎   with: ⏎     requested variable=i
+  style object, the MDX habit: "<A style={{color: \"red\"}} />\n"
+    liquid: PARSE ERROR: liquid:  --> 1:12 ⏎   | ⏎ 1 | <A style={{color: "red"}} /> ⏎   |            ^--- ⏎   | ⏎   = expected Literal
+  style object with a known name: "<A style={{color}} />\n"
+    liquid: "<A style=1 />\n"
+    dialect: DIALECT ERROR at Some(1):Some(10): Unexpected character `1` (U+0031) before attribute value, expected a character that can start an attribute value, such as `"`, `'`, or `{`
+  assign then an Expression: "{% assign y = 2 %}{y}\n"
+    liquid: "{y}\n"
+    dialect: Root[ExprF("y")]
+    expression "y": RENDER ERROR: liquid: Unknown variable ⏎   with: ⏎     requested variable=y
+  unknown tag: "{% includes 'a' %}\n"
+    liquid: PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {% includes 'a' %} ⏎   |    ^------^ ⏎   | ⏎   = Unknown tag. ⏎   with: ⏎     requested=includes ⏎     available tags=assign, break, continue, cycle, decrement, include, increment, render ⏎     available blocks=capture, case, comment, for, if, ifchanged, raw, tablerow, unless
+  percent in prose: "Growth of {% sales %} this year\n"
+    liquid: PARSE ERROR: liquid:  --> 1:14 ⏎   | ⏎ 1 | Growth of {% sales %} this year ⏎   |              ^---^ ⏎   | ⏎   = Unknown tag. ⏎   with: ⏎     requested=sales ⏎     available tags=assign, break, continue, cycle, decrement, include, increment, render ⏎     available blocks=capture, case, comment, for, if, ifchanged, raw, tablerow, unless
+
+error locations. Each body starts after 3 lines of frontmatter, so file line = body line + 3 or 4:
+  parse error, body line 3
+    PARSE ERROR: liquid:  --> 3:6 ⏎   | ⏎ 3 | {% if %} ⏎   |      ^--- ⏎   | ⏎   = Value expected.
+  parse error, unclosed block from body line 2
+    PARSE ERROR: liquid:  --> 4:1 ⏎   | ⏎ 4 |  ⏎   | ^----^ ⏎   | ⏎   = Unclosed block. {% endif %} tag expected.
+  parse error, unknown filter on body line 4
+    PARSE ERROR: liquid: Unknown filter ⏎   with: ⏎     requested filter=nosuch ⏎     available filters=__capture, abs, append, at_least, at_most, attr, capitalize, ceil, compact, concat, date, default, divided_by, downcase, escape, escape_once, first, floor, join, last, lstrip, map, minus, modulo, newline_to_br, plus, prepend, remove, remove_first, replace, replace_first, reverse, round, rstrip, size, slice, sort, sort_natural, split, strip, strip_html, strip_newlines, times, truncate, truncatewords, uniq, upcase, url_decode, url_encode, where
+  render error, body line 4
+    RENDER ERROR: liquid: Unknown variable ⏎   with: ⏎     requested variable=missing
+  render error, in a loop and an if, on the third item
+    RENDER ERROR: liquid: Unknown index ⏎   with: ⏎     variable=i ⏎     requested index=a ⏎     available indexes=b ⏎ from: {% if true %} ⏎ from: {% for i in xs  %} ⏎   with: ⏎     index=3
+  render error, a filter
+    RENDER ERROR: liquid: Invalid argument ⏎   with: ⏎     argument=operand ⏎     cause=Can't divide by zero ⏎ from: Filter error ⏎   with: ⏎     filter=divided_by : 0 ⏎     input="abc"
+  a bad tag from a loop's third iteration:
+    rendered: "Intro\n\n\n<Card title=\"one\" />\n\n<Card title=\"two\" />\n\n<Card title=\"th\"ree\" />\n\n\nOutro\n"
+    DIALECT ERROR at Some(8):Some(20): Unexpected character `"` (U+0022) in attribute name, expected an attribute name character such as letters, digits, `$`, or `_`; `=` to initialize a value; whitespace before attributes; or the end of the tag
+    mock message:
+      index.mdx, after the Liquid Pass, line 8: Unexpected character `"` (U+0022) in attribute name, expected an attribute name character such as letters, digits, `$`, or `_`; `=` to initialize a value; whitespace before attributes; or the end of the tag
+        <Card title="th"ree" />
+      Line numbers refer to the output of the Liquid Pass.
+    source line finder: lines containing the snippet's tag name in the source: Some([4])
+
+the clock (values vary, so only the shape is compared):
+  {{ "now" | date: "%Y" }}: "####"
+  {{ "today" | date: "%Y" }}: "####"
+  {{ "2026-01-02" | date: "%Y" }}: "####-##-##"
+  {{ 'now' }}: "now"
+  with our own date filter registered after stdlib:
+    {{ "now" | date: "%Y" }}: RENDER ERROR: liquid: `now` and `today` aren't available, because output must not depend on the clock. Put the date in frontmatter. ⏎ from: Filter error ⏎   with: ⏎     filter=date : "%Y" ⏎     input="now" (differs from stock)
+    {{ "NOW" | date: "%Y" }}: RENDER ERROR: liquid: `now` and `today` aren't available, because output must not depend on the clock. Put the date in frontmatter. ⏎ from: Filter error ⏎   with: ⏎     filter=date : "%Y" ⏎     input="NOW" (differs from stock)
+    {{ " today " | date: "%Y" }}: RENDER ERROR: liquid: `now` and `today` aren't available, because output must not depend on the clock. Put the date in frontmatter. ⏎ from: Filter error ⏎   with: ⏎     filter=date : "%Y" ⏎     input=" today " (differs from stock)
+    {{ "13 Jun 2016 02:30:00 +0300" | date: "%Y-%m-%d" }}: "2016-06-13" (same as stock)
+    {{ "2016-06-13 02:30:00 +0300" | date: "%a, %b %d, %y" }}: "Mon, Jun 13, 16" (same as stock)
+    {{ "hello" | date: "%Y" }}: "hello" (same as stock)
+    {{ z | date: "%Y" }}: "" (same as stock)
+    {{ 5 | date: "%Y" }}: "5" (same as stock)
+
+finding the source line for errors with no location, by searching for the name:
+  parse error, body line 3: name None, body lines []
+  parse error, unclosed block from body line 2: name None, body lines []
+  parse error, unknown filter on body line 4: name Some("nosuch"), body lines [4]
+  render error, body line 4: name Some("missing"), body lines [4]
+  render error, in a loop and an if, on the third item: name Some("a"), body lines [4]
+  render error, a filter: name None, body lines []
+
+random templates:
+  filter chains: 100000 templates: 31306 rendered, 68693 errors, 1 caught panics
+  random tokens: 100000 templates: 69744 rendered, 30256 errors, 0 caught panics
+  panic x1 at math.rs:330: "{{n|minus:9223372036854775807|round|divided_by:-1}}"

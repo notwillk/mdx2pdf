@@ -2,7 +2,7 @@
 
 **Status:** Proposal, 2026-11-02. Requirements (R1–R26) are in the [PRD](prd.md), and terms are in the [glossary](../GLOSSARY.md).
 
-**Only Spikes 1, 1b, and 2 have been run.** Other claims about how crates behave come from their documentation, and the [spikes](spikes.md) exist to test them. Choices marked *(Spike N)* could change once that spike reports.
+**Only Spikes 1, 1b, 2, and 3 have been run.** Other claims about how crates behave come from their documentation, and the [spikes](spikes.md) exist to test them. Choices marked *(Spike N)* could change once that spike reports.
 
 ## Pipeline
 
@@ -26,7 +26,7 @@ flowchart TD
 | # | Stage | Input → output | Notes |
 |---|---|---|---|
 | 1 | Split frontmatter | File text → YAML values, body | Done on raw text, because Liquid needs the values before anything is parsed. Line endings are normalized to LF here |
-| 2 | Liquid Pass | Body + scope → text | Runs on text, so it can generate tags |
+| 2 | Liquid Pass | Body + scope → text | Runs on text, so it can generate tags. See [running Liquid](#running-liquid) |
 | 3 | Parse Dialect | Text → tree | With `markdown`, inside a [panic guard](#parsing-the-dialect). JSX and expressions on; ESM, HTML, indented code, and literal autolinks off |
 | 4 | Expand | Tree → normalized tree with no MDX nodes | Runs stages 1–3 again for each Component use. See [normalization](#normalization) |
 | 5 | Serialize | Tree → Markdown string | With `pulldown-cmark-to-cmark`. The string is the required intermediate. Re-parsed and [checked](#round-trip-check) on every run |
@@ -51,7 +51,28 @@ The scope for a file is `{ ...frontmatter, meta: frontmatter, props }`. A frontm
 
 An Expression's result becomes a text node, and the serializer escapes it. That's why `{company}` is safe with `A<B`. Whitespace at the edges of the value is trimmed, because `*{x}*` with ` a ` has no Markdown spelling otherwise. In text position, strings, numbers, and booleans print, and arrays or objects are an error.
 
-Expression text goes to Liquid unchanged, with two exceptions from [Spike 2](spikes.md#spike-2-dialect-parsing): in a table cell, `\|` becomes `|`, and continuation lines of a multi-line Expression lose up to two leading spaces. Only a string spanning lines could notice the second one, so it's documented rather than fixed. `{/* comment */}` is dropped rather than evaluated. Evaluating to a typed value rather than a string is unproven *(Spike 3)*.
+Expression text goes to Liquid unchanged, with two exceptions from [Spike 2](spikes.md#spike-2-dialect-parsing): in a table cell, `\|` becomes `|`, and continuation lines of a multi-line Expression lose up to two leading spaces. Only a string spanning lines could notice the second one, so it's documented rather than fixed. `{/* comment */}` is dropped rather than evaluated.
+
+## Running Liquid
+
+[Spike 3](spikes.md#spike-3-liquid-behavior) confirmed that `liquid` can do both jobs, with these additions:
+
+| Addition | Why |
+|---|---|
+| Sorted object keys, through an 11-line `liquid-core` patch ([ADR 0005](adr/0005-sort-liquid-object-keys.md)) | `Object` is a `HashMap` with a random seed, so `{% for kv in obj %}` printed 6 different orders in 6 runs, which breaks R23. Keys come out alphabetically, so authors who need an order use a list |
+| Our own `date` filter, registered after the standard library | `"now" \| date` reads the clock, which also breaks R23. Ours rejects `now` and `today`, and otherwise matches the stock filter |
+| An `attr` filter, for `<Card title="{{ t \| attr }}" />` | It escapes `&`, `"`, and line endings. All 20,000 random values came back exact. Without it, 15% came back silently different |
+| Typed evaluation: render `{{ EXPR \| __capture }}`, and keep the value the filter receives | There's no public function to evaluate an expression. It worked for arrays, objects, numbers, booleans, and null |
+| Before wrapping an Expression, reject `}}`, `{{`, `%}`, and `{%` outside strings. After, require empty output and exactly one capture | Otherwise `"" }}{{ name` escapes the wrapper. With this, none of 20 attempts got through, and no valid Expression was flagged |
+| Rewrite Expression errors to show the author's text | Parse errors quote the wrapper and count columns from it |
+| A `catch_unwind` guard, on a thread with a large stack | One panic in 200,000 random templates. Nesting blocks 5,000 to 10,000 deep aborts on the default stack, and a guard can't catch that, but a 1 GiB stack contained it. The right size hasn't been measured |
+| Find the name in the source for errors with no line | See [diagnostics](#diagnostics) |
+
+**Undefined values:** `{{ missing }}`, comparisons, `for`, and `assign` are errors naming the variable. `{% if missing %}` is silently false, and `{{ missing | default: "x" }}` is an error, both open questions in the PRD.
+
+**Whitespace:** write `{%- if c %}` and `{%- endif %}` inside a block quote. `{%- -%}` on both sides glues lines together, and no trimming splits the quote. Hyphens don't trim tabs.
+
+**Frontmatter numbers:** YAML turns `1.10` into `1.1`, `007` into `7`, and `yes` into `true`, and authors have to quote those values. That's the behavior of YAML, not a bug to fix, but it belongs in the docs.
 
 ## Parsing the Dialect
 
@@ -276,7 +297,7 @@ Versions are current as of 2026-11-02, and each was traced to its upstream proje
 |---|---|---|---|
 | [`markdown`](https://github.com/wooorm/markdown-rs) | 1.0.0 plus six patches, as [our fork](adr/0004-fork-the-markdown-parser.md) | Dialect parsing in Stage 3 | **Medium to high.** It's the only Rust parser for MDX syntax we found, but upstream has no commits on main since 2025-04-23 and 65 open PRs, so we own any further fixes. [Spike 2](spikes.md#spike-2-dialect-parsing) confirmed the tree is what we need. Pin the fork by commit. Its own test suite hasn't been run yet |
 | [`pulldown-cmark-to-cmark`](https://github.com/Byron/pulldown-cmark-to-cmark), [`pulldown-cmark`](https://github.com/pulldown-cmark/pulldown-cmark) | 23.0.0, 0.13.6 | Tree → Markdown in Stage 5, and Markdown parsing in Stage 6 | **Low to medium.** Passed [Spike 1b](spikes.md#spike-1b-event-based-serializer) with no panics. It's on its 23rd major version and moving fast, so pin it exactly and expect upgrade work |
-| [`liquid`](https://github.com/cobalt-org/liquid-rust) | 0.26.11 | Liquid Pass and Expressions | **Medium.** Last release 2025-02. Still tended, with dependency updates through 2026-10 and a maintainer commit in 2026-07, but little new work. Aims for Shopify conformance |
+| [`liquid`](https://github.com/cobalt-org/liquid-rust) | 0.26.11 | Liquid Pass and Expressions | **Medium.** Last release 2025-02. Still tended, with dependency updates through 2026-10 and a maintainer commit in 2026-07, but little new work. Aims for Shopify conformance. [Spike 3](spikes.md#spike-3-liquid-behavior) confirmed both jobs work, with [additions](#running-liquid). Pin it exactly, and carry the [11-line patch](adr/0005-sort-liquid-object-keys.md) to `liquid-core` for object order |
 | [`typst`, `typst-pdf`, `typst-kit`, `typst-assets`](https://github.com/typst/typst) | 0.15.1 | Typesetting and PDF | **Medium.** Actively developed, but expect breaking changes on upgrade. Needs Rust 1.92+. The upstream README only covers the CLI, so the library crates are confirmed through docs.rs and the changelog |
 | [`serde-saphyr`](https://github.com/bourumir-wyngs/serde-saphyr) | 2.0.0 | Frontmatter YAML | **Low to medium.** Young (created 2025-09), but fuzz-tested, with resource budgets. Rejects duplicate keys by default. Deserializing to Liquid values is *(Spike 3)* |
 | [`toml`](https://github.com/toml-rs/toml) | 1.1.8 | `page.toml` | Low. `Spanned` can give error locations |
@@ -307,12 +328,13 @@ Errors use `miette` where a source span is available, and name the file in every
 | Source | Where the location comes from | Quality |
 |---|---|---|
 | YAML, `page.toml` | Parser spans | Good |
-| Liquid | The engine's error message | To be seen *(Spike 3)* |
+| Liquid syntax | Line and column in the body, so add the frontmatter's length | Good. An unclosed block only points at the end of the file |
+| Liquid, undefined names and unknown filters | No line. The message names it and gives a trace, such as `from: {% for i in xs %}`, `index=3`, so we search the source for the name | **Medium.** A name used on several lines gives several candidates |
 | MDX parse, unknown Component, Props | Spans into the **Liquid output**, not the source. Every parse error in Spike 2 had one, though an open quote's points at the end of the file, and tags and Expressions point at their source, but attributes have no position of their own | **Weak.** After the Liquid Pass, line numbers no longer match the file |
 | Round-trip check | The first difference between the trees | **Weak.** It compares the whole document, so it can show the text but not always which Component produced it |
 | A panic or malformed tree from `markdown` | The file being parsed, caught by a `catch_unwind` guard | **Weak, but rare.** It has no location, so the message suggests checking for an unclosed tag. The fork leaves one known shape: a table header, then a list containing an unclosed `<` |
 
-Mapping Liquid output back to source lines probably isn't practical, so the fallback is to show the rendered snippet along with the file name *(Spike 3)*.
+Mapping Liquid output back to source lines probably isn't practical, so the fallback is to show the rendered snippet along with the file name. [Spike 3](spikes.md#spike-3-liquid-behavior) tested this on a bad tag from a loop's third iteration, and the snippet shows the problem clearly.
 
 Typst errors are usually our bugs, since authors can't write Typst. Missing images and fonts get checked before typesetting so that they produce useful messages, and anything left is reported as an internal error, with `--emit-md` as the way to get the input for a bug report.
 
@@ -320,10 +342,10 @@ Common mistakes get specific hints. See [known hazards](#known-hazards).
 
 ## Determinism and safety
 
-- **Determinism (R23):** no system fonts, no network, a fixed date, and a fixed or absent PDF timestamp and identifier. Tests compare SHA-256 hashes *(Spike 4)*.
+- **Determinism (R23):** no system fonts, no network, a fixed date, and a fixed or absent PDF timestamp and identifier. Tests compare SHA-256 hashes *(Spike 4)*. Liquid needs [sorted object keys and no clock](#running-liquid).
 - **No code runs:** there's no JavaScript, and in this configuration Liquid can't read files or reach the network.
 - **Files:** images and fonts must resolve inside the asset root after symlinks are resolved. Component names can't contain path separators.
-- **Not a sandbox:** a `{% for %}` loop can still use unbounded time and memory. Nesting depth is limited, but the tool assumes documents come from their author rather than from an untrusted source.
+- **Not a sandbox:** a `{% for %}` loop can still use unbounded time and memory, and `(1..100000000)` writes 100 MB in about 8 seconds. Nesting depth is limited, but the tool assumes documents come from their author rather than from an untrusted source.
 
 ## Testing
 
@@ -357,16 +379,22 @@ Common mistakes get specific hints. See [known hazards](#known-hazards).
 
 ## Known hazards
 
-Small inputs likely to break a naive implementation. Each gets a test fixture, and the failures are the reason for specific hints in error messages. Behaviors marked only with a spike other than 1, 1b, and 2 haven't been observed yet.
+Small inputs likely to break a naive implementation. Each gets a test fixture, and the failures are the reason for specific hints in error messages. Behaviors marked only with a spike other than 1, 1b, 2, and 3 haven't been observed yet.
 
 | Input | Problem | Handling | Spike |
 |---|---|---|---|
-| `run: echo ${{ secrets.TOKEN }}` in a code fence | Liquid evaluates it or fails | By design (R6). Error hint suggests `{% raw %}` | 3 |
+| `run: echo ${{ secrets.TOKEN }}` in a code fence | `Unknown variable`, naming `secrets` | By design (R6). Error hint suggests `{% raw %}`, which works inside a fence | 3 |
 | `{{ company }}` with `company: "A<B"` | Value is read as MDX. `A<B, C` is an error, and `A<B and more` silently stays text | Use `{company}`. Error hint suggests it, and the unterminated tag check catches the silent case | 2, 3, 5 |
-| `<Card title="{{ t }}" />` with `t: 'Say "hi"'` | Value breaks the attribute | A custom filter to quote values as attributes | 3 |
-| `{% for i in xs %}<Card title={i.name} />{% endfor %}` | `i` no longer exists when `{i.name}` runs | Clear undefined-variable error suggesting `{{ }}` | 3, 5 |
-| `<A style={{color: "red"}} />` | MDX habit, and Liquid claims the `{{` | Error hint explaining the difference | 3 |
-| `> a`, `{% if x %}`, `> b`, `{% endif %}` on separate lines | Blank lines split one quote into two, and `{%- -%}` can glue lines together | Document the pattern and test it | 3 |
+| `<Card title="{{ t }}" />` with `t: 'Say "hi"'` | Value breaks the attribute with an error. With `&#35;` it silently changes to `#` | Use `{{ t \| attr }}`. Error hint suggests it, but nothing catches the silent case | 3 |
+| `{% for kv in obj %}`, `{{ obj }}` | Stock `liquid` prints in a random order per process, which breaks R23 | Sorted keys, through our [patch](adr/0005-sort-liquid-object-keys.md) | 3 |
+| `"now" \| date` | Reads the clock, which breaks R23 | Our own `date` filter gives an error suggesting frontmatter | 3 |
+| `{% if itmes %}`, a typo | Silently false, so content disappears | Documented. An open question in the PRD | 3 |
+| `{{ missing \| default: "x" }}` | An error, where Shopify's prints `x` | Hint: use `{% if %}`. An open question in the PRD | 3 |
+| `version: 1.10`, `zip: 02134`, `ok: yes` in frontmatter | Become `1.1`, `2134`, and `true` | Documented: quote them | 3 |
+| `{%` nested 5,000 or more levels deep | Aborts the process on the default stack | A thread with a large stack | 3 |
+| `{% for i in xs %}<Card title={i.name} />{% endfor %}` | `i` no longer exists when `{i.name}` runs | Confirmed: `Unknown variable`, naming `i`. Error hint suggests `{{ }}` | 3, 5 |
+| `<A style={{color: "red"}} />` | MDX habit, and Liquid claims the `{{`, giving `expected Literal`. `{{color}}` with a known name prints the value, and then the Dialect rejects it | Error hint explaining the difference | 3 |
+| `> a`, `{% if x %}`, `> b`, `{% endif %}` on separate lines | Blank lines split one quote into several, and `{%- -%}` glues lines together | Document `{%- if x %}` and `{%- endif %}`, which keep one quote whether `x` is true or false | 3 |
 | `<Note>hi</Note>` alone on a line | Parses as inline | Unravel to block level | 2, 5 |
 | `Hello <Note /> there`, where `Note` has two paragraphs | Blocks in inline position | Error with location | 5 |
 | `    total` inside a tag | A paragraph in MDX, code in Markdown | Tree expansion and serialization | 1, 5 |
@@ -377,7 +405,7 @@ Small inputs likely to break a naive implementation. Each gets a test fixture, a
 | `Use {curly} braces` | Read as an Expression | Undefined-variable error, with `\{` as the fix | 2 |
 | `{x \| replace: "}", ""}` | Brace matching ends the Expression at the `}` in the string, silently | The expression callback tracks strings | 2 |
 | `{it's}` on line 1 of a long file | With the callback, the error points at the end of the file | Re-parse with brace matching to find the Expression with the open quote | 2, 5 |
-| `{it's} and {don't}`, or a stray quote with another quote later on | With the callback, the two become one Expression, and it can swallow whole blocks. Liquid will probably reject it, but that's untested | Reject an Expression containing a blank line, and rely on Liquid for the rest | 2, 3, 5 |
+| `{it's} and {don't}`, or a stray quote with another quote later on | With the callback, the two become one Expression, and it can swallow whole blocks. Liquid rejects it with `expected Literal` | Reject an Expression containing a blank line, and rely on Liquid for the rest | 2, 3, 5 |
 | `<Card title="AT&T" />` | Panics stock `markdown` | Our fork parses it correctly | 2 |
 | `<A>hi`, `---`, `</A>` | Panics stock `markdown`: an unclosed tag before a setext underline | Our fork gives a located error | 2 |
 | `<Card title="x"`, with no `>` | Silently prints as text | Unterminated tag check (R26) | 2, 5 |
@@ -408,6 +436,6 @@ Small inputs likely to break a naive implementation. Each gets a test fixture, a
 1. **Prepare.** Done: `.devcontainer/install.sh` installs Rust 1.92 or later when the container starts.
 2. **[Spikes](spikes.md).** Run them in the order given there and record findings. Update this document, and write an ADR for the Renderer once Spike 4 settles it. The spike code stays in `spikes/` as evidence, and Spike 1's suites move into the real tests.
 3. **Milestone 1: Markdown to PDF.** `mdx2pdf-cli` and `mdx2pdf-render`, Markdown Input, `--page`. This is already a useful tool, it proves the second half of the pipeline, and it doesn't need `markdown` at all.
-4. **Milestone 2: Projects without Components.** First create the [`markdown` fork](adr/0004-fork-the-markdown-parser.md) from its saved patches, and run its test suite. Then frontmatter, Liquid, Expressions, `--emit-md`, normalization, serialization, and the round-trip check.
+4. **Milestone 2: Projects without Components.** First create the [`markdown` fork](adr/0004-fork-the-markdown-parser.md) from its saved patches, and run its test suite. Apply the [`liquid-core` patch](adr/0005-sort-liquid-object-keys.md), and run the `liquid` workspace's tests with it. Then frontmatter, Liquid, Expressions, `--emit-md`, normalization, serialization, and the round-trip check.
 5. **Milestone 3: Components.** Resolution, Props, `<Content />`, unraveling, recursion errors.
 6. **Milestone 4: Release.** Error-message hints for every known hazard, default styling, and prebuilt binaries.

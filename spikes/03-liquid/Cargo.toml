@@ -1,0 +1,18 @@
+# Disposable. See docs/spikes.md, Spike 3.
+[package]
+name = "spike-liquid"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+liquid = "=0.26.11"
+liquid-core = { version = "=0.26.11", features = ["derive"] }
+serde-saphyr = "=2.0.0"
+# Stock, not the fork: the fork changes panics, and these checks don't depend on them.
+markdown = "=1.0.0"
+
+[profile.release]
+panic = "unwind"
+
+[workspace]
