@@ -1,0 +1,27 @@
+# Disposable. See docs/spikes.md, Spike 4.
+[package]
+name = "spike-typst"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Upstream's README only documents installing the CLI, so these come from upstream's
+# tag rather than the registry. The published 0.15.1 source is identical (see findings).
+[dependencies]
+typst = { git = "https://github.com/typst/typst", tag = "v0.15.1" }
+typst-layout = { git = "https://github.com/typst/typst", tag = "v0.15.1" }
+typst-pdf = { git = "https://github.com/typst/typst", tag = "v0.15.1" }
+typst-kit = { git = "https://github.com/typst/typst", tag = "v0.15.1", default-features = false, features = ["embedded-fonts"] }
+pulldown-cmark = { version = "=0.13.6", default-features = false }
+
+[profile.release]
+panic = "unwind"
+strip = true
+
+# For measuring what link-time optimization saves.
+[profile.small]
+inherits = "release"
+lto = true
+codegen-units = 1
+
+[workspace]

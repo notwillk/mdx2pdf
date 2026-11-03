@@ -193,6 +193,8 @@ Each has a working default, used until someone decides otherwise.
 | A bare `.mdx` file as input | Reject it, with a hint to put it in a directory as `index.mdx` |
 | Can Components read the Entry Document's frontmatter? | No, pass values through Props |
 | `{/* comment */}`, which MDX authors expect | Accept it as a comment |
+| Characters no available font has, such as Chinese with the bundled fonts | Report an error naming them and suggesting a `fonts/` directory. Bundle no more fonts, because the binary is already 50 MB |
+| Does R23's byte-identical output hold across platforms and CPUs? | Promise it for the same binary on one machine, until tested. Typst's maintainers say floating point can make it differ |
 | Namespaced Components such as `<Ns.Sub />` | Later |
 | `{% if missing %}` with an undefined name, including a typo | Treat it as false, which is how authors test optional values and what Shopify does by default, though a typo drops content silently |
 | `{{ missing \| default: "x" }}`, which is an error in `liquid` but prints `x` in Shopify's | Leave it as an error, with a hint to use `{% if %}` |

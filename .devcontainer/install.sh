@@ -20,3 +20,8 @@ if [ "$major" -lt 1 ] || { [ "$major" -eq 1 ] && [ "$minor" -lt "$min_minor" ]; 
 fi
 
 echo "install.sh: Rust $version ready"
+
+# Test-only: the renderer's tests and Spike 4 check PDFs with pdftotext and friends.
+if ! command -v pdftotext >/dev/null 2>&1; then
+  sudo apt-get install -y -qq poppler-utils || echo "install.sh: couldn't install poppler-utils, so PDF checks won't run" >&2
+fi

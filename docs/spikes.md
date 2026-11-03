@@ -1,6 +1,6 @@
 # Spikes
 
-Short experiments to test the riskiest assumptions in the [technical design](technical-design.md) before building on them. Status as of 2026-11-02: Spike 1 failed, Spike 1b passed every bar except exact output and its recommendations were accepted, Spike 2 passed with required changes and its fork recommendation was accepted, Spike 3 passed three of its four bars with required changes and its patch recommendation was accepted, and Spikes 4 and 5 haven't started.
+Short experiments to test the riskiest assumptions in the [technical design](technical-design.md) before building on them. Status as of 2026-11-02: Spike 1 failed, Spike 1b passed every bar except exact output and its recommendations were accepted, Spike 2 passed with required changes and its fork recommendation was accepted, Spike 3 passed three of its four bars with required changes and its patch recommendation was accepted, Spike 4 passed except that no second container was available, and Spike 5 hasn't started.
 
 ## Ground rules
 
@@ -19,13 +19,12 @@ Short experiments to test the riskiest assumptions in the [technical design](tec
 | [1b](#spike-1b-event-based-serializer) | Can `pulldown-cmark-to-cmark` serialize our trees through a small adapter? | 0.5 day | Write our own serializer. **Not needed:** it passed every bar except exact output |
 | [2](#spike-2-dialect-parsing) | Does `markdown` parse the Dialect? | 0.5 day | Work around the gaps, or change parser. **Not needed:** it passed, with required changes |
 | [3](#spike-3-liquid-behavior) | Does `liquid` behave the way the design needs? | 1 day | Custom filters, weaker errors, or a fork. **Mostly:** custom filters and a small patch, with `{% if missing %}` still silent |
-| [4](#spike-4-typst-embedding) | Can Typst embed cleanly and deterministically? | 1–2 days | Try Fulgur |
+| [4](#spike-4-typst-embedding) | Can Typst embed cleanly and deterministically? | 1–2 days | Try Fulgur. **Not needed:** Typst is confirmed ([ADR 0006](adr/0006-typst-is-the-renderer.md)) |
 | [5](#spike-5-end-to-end-expansion) | Does Expansion work end to end? | 1–2 days | Revisit the expansion design |
 
 Run the remaining spikes in this order:
 
-1. **Spike 4** comes next.
-2. **Spike 5** comes last, because it needs a working serializer and normalization.
+1. **Spike 5** is the last one. It needs a working serializer and normalization.
 
 ## Spike 1: Markdown serializer
 
@@ -613,7 +612,82 @@ That's a mock of the message we'd write, and the crate only supplies the parts. 
 
 **If it fails:** Try Fulgur with the same fixtures, emitting HTML from the same tree. Only stages 7 and 8 would change. Test Fulgur's determinism first, since its README warns that output can vary across machines. If both fail, a person needs to revisit the self-contained binary requirement.
 
-**Findings:** _Not started._
+**Findings (2026-11-02): Typst is confirmed, with one bar not fully met** ([ADR 0006](adr/0006-typst-is-the-renderer.md)). Numbers are from `spikes/04-typst/results/`, and two runs of the deterministic suites matched exactly. I looked at the rendered structure pages, the script pages, and the landscape, margins, and page numbers pages myself.
+
+| Bar | Result |
+|---|---|
+| `pdftotext` finds every fixture string, adversarial text unchanged | **Pass.** 1,134 of 1,134 adversarial placements, and 37 of 37 structure strings. Scripts the bundled fonts lack are a separate problem, below |
+| SHA-256 identical across two runs | **Pass.** See below |
+| SHA-256 identical in a second clean container | **Not met.** No container is possible here, so a chroot on the same machine stands in |
+| No system fonts or network | **Pass.** No socket and no font path in `strace`, and output didn't change when fonts were installed |
+| Page Settings visibly apply | **Pass.** All 9 settings measured correct, and the 3 I looked at were visibly right. All 7 invalid values were rejected before Typst saw them |
+
+**Determinism.** All of these gave the same SHA-256, for a 2-page mixed document and a 50-page one:
+
+- An empty environment, two other time zones, Japanese and Turkish locales, a missing `HOME`, `SOURCE_DATE_EPOCH`, 1 and 32 Rayon threads, one CPU, and a different working directory.
+- 20 separate processes, and 20 runs in one process.
+- 14 system font files installed, then removed. This machine started with no fonts, so without this step a pass would mean little.
+- A chroot holding only the binary, its 4 libraries, the input, and the images (mixed document only).
+- A second clean build in a different path, whose binary differs by about 15 KB, and an LTO build. Both gave the same PDF, which suggests compiler settings don't disturb the layout.
+
+**What this doesn't prove:** everything ran on one x86-64 Linux machine. Typst's maintainers say floating point can make output differ across platforms and CPUs ([#7683](https://github.com/typst/typst/issues/7683)). So whether R23 holds beyond one machine is unknown, and it's in the PRD's open questions. To check, copy the binary and `fixtures/` into a real second container and run `check-determinism.sh`, then compare with `results/record/determinism.txt`.
+
+**Fonts are the main finding:**
+
+| Script | Bundled fonts | With a `fonts/` directory |
+|---|---|---|
+| Latin, Greek, Cyrillic, Hebrew | Good | Same |
+| Arabic | Connected, but stretched in a monospace font | Not tested with a better font |
+| Devanagari | No conjuncts, so it reads as separate letters. **Counted as 0 missing glyphs** | Shaped correctly with Lohit, but `pdftotext` repeats a syllable |
+| CJK | **Empty boxes** | Correct with IPA Gothic, except Korean, which that font lacks |
+| Emoji | **Empty boxes** | Correct, in color. `☑` also turns into an emoji once this font is present |
+
+- **Typst gives no warning for a missing glyph.** Without a check of our own, a Chinese document is a PDF of empty boxes with exit code 0. Walking the laid-out pages counts these reliably, so the Renderer should report them, naming the characters and suggesting `fonts/`.
+- **`pdftotext` is a weak test for this.** On the page of boxes, it still extracted most of the text. Only `你` of `你好世界` was lost, so most of the sample would have passed.
+- **Fonts from a directory stay deterministic,** with the same hash across two runs.
+
+Bundling more is a size decision: the bundled fonts are about 10 MB, and the IPA Gothic and Noto Color Emoji files alone are 6 MB and 11 MB. The working default in the PRD is to bundle nothing more.
+
+**How to emit Typst.** The design's table used markup, such as `_..._` and `-`, but that depends on neighboring text and line starts. **Use function forms instead:** `#emph[...];`, `#list(...)`, `#heading(level: 2)[...]`, and so on, ending inline calls with `;` so the following text can't become a field access or an argument. Code, URLs, and alt text go through `string_literal`, and all 9 tricky cases compiled with their text intact.
+
+**Escape text as string literals.** Writing text as `#"...";` only needs `\`, `"`, and line endings escaped, so there's no list of Typst syntax to maintain.
+
+| | Escape table | String literal |
+|---|---|---|
+| Adversarial placements | 567 of 567 | 567 of 567 |
+| 20,000 fuzzed strings | 19,999 | **20,000** |
+| PDF of the two real documents | **Byte-identical between the two** | |
+
+The table's one miss is a soft hyphen followed by two U+2028 characters, and I didn't isolate exactly why. What I did see separately is that in the table mechanism, `a`, U+2028, `b` prints as `ab`, and two in a row split the paragraph, where a string literal gives line breaks. All text in the fuzz was checked on laid-out pages, with 300 more through Markdown and `pdftotext`, whose 15 misses all contain CJK.
+
+**Files.** Each of these was refused, and the World's log shows nothing outside the root was read: `..`, an absolute path, a symlink leaving the root, a URL, a `file:` URL, and SVGs linking to a file outside, an absolute file, or a URL. `..` and the SVG links never reach our `file()`, because Typst refuses them first. The URL check before compiling is ours, and the symlink check needs our `canonicalize`. Messages are mostly usable, such as `path "../secret.png" would escape the project root`. `![a](/etc/hostname)` looks in the asset root, so it's just not found.
+
+**PDF details.** The title comes from the first heading, there's no creation date, and output is tagged, with bookmarks. `/Creator` says `Typst 0.15.1`.
+
+**Robustness.**
+
+- **Random Markdown:** all 2,000 documents behaved correctly in each mechanism, with 1,972 compiling and 28 correctly reporting a missing image. There were no panics or syntax errors from emitted Typst. That was after fixing two emitter bugs the suite found: a footnote that references itself, and a footnote referenced only from another definition.
+- **Nesting gives clean errors:** quotes and lists work at 10 levels, and 50 gives `maximum show rule depth exceeded`, a limit worth a hint. Beyond that, it's `maximum parsing depth exceeded`.
+- **One abort, in my emitter:** 10,000 nested emphases aborted before Typst was called, and a 1 GiB stack contained it, so the real emitter needs a depth limit too.
+
+**Measurements, for a person to set targets from:**
+
+| Measure | Result |
+|---|---|
+| Stripped release binary | 50.0 MB, about 10 MB of it fonts |
+| With LTO and one codegen unit | 44.6 MB |
+| Clean build | 114 seconds, or 238 for the LTO profile (8 cores) |
+| Rendering a 2-page mixed document | 28–46 ms, in a new process each time |
+| Rendering 50 pages | 208–233 ms, in a new process each time |
+| 50-page PDF | 637 KB |
+
+The spike's "1 page" is 2 here, because the mixed fixture needs 2.
+
+**Vetting.** Upstream's README only documents installing the CLI, so the harness uses git at tag `v0.15.1`. The source of `typst`, `typst-pdf`, and `typst-kit` published on crates.io is identical to that tag. `fontdb` is in the dependency tree through SVG support, but nothing scans for fonts, as `strace` confirms.
+
+**Not tested:** other platforms and CPUs; a better Arabic font; long words, wide tables, and large images overflowing the page; styling, which is Milestone 4.
+
+**Worth reporting upstream** (not reported yet): a warning when a glyph is missing from every font.
 
 ## Spike 5: End-to-end Expansion
 

@@ -1,0 +1,85 @@
+label: record
+
+structure: 2 pages, 37 of 37 strings found, missing [], 0 missing glyphs, warnings []
+  pdfinfo: Title: Report Title | Creator: Typst 0.15.1 | Tagged: yes | Pages: 2
+  links: ["https://example.com/a?b=c"]
+  fonts: ["DDVQUL+LibertinusSerif-Bold-Identity-H", "QNJFDM+LibertinusSerif-Regular-Identity-H", "DMFRRH+LibertinusSerif-Italic-Identity-H", "SFIMIU+DejaVuSansMono"]
+  struct tree: 197 lines, H1 tags: 1
+
+adversarial text, each string in each position, through Markdown, then pdftotext:
+  1134 of 1134 found unchanged
+
+strings in code, URLs, and alt text:
+  language name: compiles, text "code", links [], 
+  code with quotes and slashes: compiles, text "\"\\n\" #read(\"x\") $x$ \\", links [], 
+  inline code with a quote and slash: compiles, text "\" \\ #x", links [], 
+  url with a quote: compiles, text "t", links ["/a\"b"], 
+  url with a backslash: compiles, text "t", links ["/a\\b"], 
+  url with a parenthesis: compiles, text "t", links ["/a)b"], 
+  empty url: compiles, text "t", links [], 
+  alt text with a quote: compiles, text "", links [], 
+  title with a quote: compiles, text "a \"b\" \\c", links [], Title:           a "b" \c
+
+scripts, embedded fonts only:
+  latin accents [ embedded]: pdftotext finds it: true, 0 missing glyphs, warnings []
+          greek [ embedded]: pdftotext finds it: true, 0 missing glyphs, warnings []
+       cyrillic [ embedded]: pdftotext finds it: true, 0 missing glyphs, warnings []
+         hebrew [ embedded]: pdftotext finds it: true, 0 missing glyphs, warnings []
+         arabic [ embedded]: pdftotext finds it: true, 0 missing glyphs, warnings []
+            cjk [ embedded]: pdftotext finds it: false, 14 missing glyphs, warnings []
+     devanagari [ embedded]: pdftotext finds it: true, 0 missing glyphs, warnings []
+          emoji [ embedded]: pdftotext finds it: false, 2 missing glyphs, warnings []
+    task glyphs [ embedded]: pdftotext finds it: true, 0 missing glyphs, warnings []
+
+page settings:
+        default: size ok (Page size:       595.276 x 841.89 pts (A4)), left margin ok (x=70.87), font ok, numbers ok, body size 11.0pt, largest 15.4pt
+             a4: size ok (Page size:       595.276 x 841.89 pts (A4)), left margin ok (x=70.87), font ok, numbers ok, body size 11.0pt, largest 15.4pt
+         letter: size ok (Page size:       612 x 792 pts (letter)), left margin ok (x=70.87), font ok, numbers ok, body size 11.0pt, largest 15.4pt
+      landscape: size ok (Page size:       841.89 x 595.276 pts (A4)), left margin ok (x=70.87), font ok, numbers ok, body size 11.0pt, largest 15.4pt
+    custom size: size ok (Page size:       283.465 x 566.929 pts), left margin ok (x=70.87), font ok, numbers ok, body size 11.0pt, largest 15.4pt
+        margins: size ok (Page size:       595.276 x 841.89 pts (A4)), left margin ok (x=141.73), font ok, numbers ok, body size 11.0pt, largest 15.4pt
+           font: size ok (Page size:       595.276 x 841.89 pts (A4)), left margin ok (x=70.87), font ok, numbers ok, body size 11.0pt, largest 15.4pt
+           size: size ok (Page size:       595.276 x 841.89 pts (A4)), left margin ok (x=70.87), font ok, numbers ok, body size 20.0pt, largest 28.0pt
+   page numbers: size ok (Page size:       595.276 x 841.89 pts (A4)), left margin ok (x=70.87), font ok, numbers ok, body size 11.0pt, largest 15.4pt
+invalid settings (all must be errors):
+  "[paper]\nsize = \"a5x\"\n": Err("unknown paper size \"a5x\"")
+  "[paper]\nnope = \"x\"\n": Err("unknown key nope in [paper]")
+  "[nope]\nx = 1\n": Err("unknown section [nope]")
+  "[type]\nfont = \"No Such Font\"\n": Err("unknown font \"No Such Font\"")
+  "[type]\nsize = \"11pt\"); #read(\"x\") //\"\n": Err("size: invalid length \"11pt\\\"); #read(\\\"x\\\") //\"")
+  "[margins]\nleft = \"1cm)\"\n": Err("left: invalid length \"1cm)\"")
+  "[type]\nfont = \"x\\\"), #pagebreak()\"\n": Err("unknown font \"x\\\\\\\"), #pagebreak()\"")
+
+images, with the asset root at fixtures/assets:
+  png: compiled true (as expected), warnings [], reads ["/photo.png"]
+  svg: compiled true (as expected), warnings [], reads ["/logo.svg"]
+  missing: compiled false (as expected), error: file not found (searched at /workspaces/mdx2pdf/spikes/04-typst/fixtures/assets/nope.png), reads ["/nope.png"]
+  parent directory: compiled false (as expected), error: path `"../secret.png"` would escape the project root, reads []
+  deep parent directory: compiled false (as expected), error: path `"../../../../../../etc/hostname"` would escape the project root, reads []
+  absolute path: compiled false (as expected), error: file not found (searched at /workspaces/mdx2pdf/spikes/04-typst/fixtures/assets/etc/hostname), reads ["/etc/hostname"]
+  symlink leaving the root: compiled false (as expected), error: failed to load file (access denied), reads ["/escape-link.png", "DENIED /escape-link.png"]
+  url: compiled false (as expected), emitter: Remote and absolute images aren't supported: http://127.0.0.1:9/x.png, reads []
+  file url: compiled false (as expected), emitter: Remote and absolute images aren't supported: file:///etc/hostname, reads []
+  not an image: compiled false (as expected), error: unknown image format, reads ["/notes.txt"]
+  svg referencing a file outside: compiled false (as expected), error: failed to load linked image ../secret.png in SVG (path `"../secret.png"` would escape the project root), reads ["/outside.svg"]
+  svg referencing an absolute file: compiled false (as expected), error: failed to load linked image file:///etc/hostname in SVG (absolute paths are not allowed), reads ["/abs.svg"]
+  svg referencing a url: compiled false (as expected), error: failed to load linked image http://127.0.0.1:9/x.png in SVG (URLs are not allowed), reads ["/url.svg"]
+
+started list: "Before the list. 7. started at seven 8. and eight"
+
+long document: 50 pages, 637 KB, section 78 found: true, footnote 78 found: true, 0 missing glyphs
+
+escaping fuzz, 20,000 strings per mechanism, checked on the laid-out pages:
+  escape table: 19999 of 20000 unchanged, 0 batches failed to compile, 0 panics
+    shortest miss "\u{ad}\u{2028}\u{2028}`/"; tokens in misses: [("/", 1), ("`", 1), ("\u{ad}", 1), ("\u{2028}", 1)]
+    first few: ["\u{ad}\u{2028}\u{2028}`/"]
+  string literal: 20000 of 20000 unchanged, 0 batches failed to compile, 0 panics
+  through Markdown and pdftotext, escape table: 285 of 300 unchanged, 0 of the misses contain no CJK, which bundled fonts lack: []
+
+random Markdown, 2,000 documents, escape table: 1972 compiled
+  error x28: file not found (searched at /workspaces/mdx2pdf/spikes/04-typst/fixtur
+    first input: "\n```rust\n\n```\n&#35;\n- [x] _\n# \n- [ ] $#![**__\n===\n=](/u)*<!-- c -->"
+
+random Markdown, 2,000 documents, string literal: 1972 compiled
+  error x28: file not found (searched at /workspaces/mdx2pdf/spikes/04-typst/fixtur
+    first input: "\n```rust\n\n```\n&#35;\n- [x] _\n# \n- [ ] $#![**__\n===\n=](/u)*<!-- c -->"

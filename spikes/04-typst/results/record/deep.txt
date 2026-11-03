@@ -1,0 +1,45 @@
+label: record
+Timeout 30s per case, then a 1 GiB stack where the default stack aborted.
+
+    quote depth     10: emitted 344 bytes ⏎ compiled 1 pages ⏎ pdf 5458 bytes
+    quote depth     50: emitted 1264 bytes ⏎ compile error: maximum show rule depth exceeded
+    quote depth    100: emitted 2414 bytes ⏎ compile error: maximum show rule depth exceeded
+    quote depth    500: emitted 11614 bytes ⏎ compile error: maximum parsing depth exceeded; maximum parsing depth exceeded; maximum parsing depth exce
+    quote depth   1000: emitted 23114 bytes ⏎ compile error: maximum parsing depth exceeded; maximum parsing depth exceeded; maximum parsing depth exce
+    quote depth  10000: emitted 230114 bytes ⏎ compile error: maximum parsing depth exceeded; maximum parsing depth exceeded; maximum parsing depth exce
+     list depth     10: emitted 352 bytes ⏎ compiled 1 pages ⏎ pdf 8567 bytes
+     list depth     50: emitted 1312 bytes ⏎ compile error: maximum show rule depth exceeded
+     list depth    100: emitted 2512 bytes ⏎ compile error: maximum parsing depth exceeded; maximum parsing depth exceeded; maximum parsing depth exce
+     list depth    500: emitted 12112 bytes ⏎ compile error: maximum parsing depth exceeded; maximum parsing depth exceeded; maximum parsing depth exce
+     list depth   1000: emitted 24112 bytes ⏎ compile error: maximum parsing depth exceeded; maximum parsing depth exceeded; maximum parsing depth exce
+     list depth  10000: emitted 240112 bytes ⏎ compile error: maximum parsing depth exceeded; maximum parsing depth exceeded; maximum parsing depth exce
+  ordered depth     10: emitted 452 bytes ⏎ compiled 1 pages ⏎ pdf 8586 bytes
+  ordered depth     50: emitted 1812 bytes ⏎ compile error: maximum show rule depth exceeded
+  ordered depth    100: emitted 3512 bytes ⏎ compile error: maximum parsing depth exceeded; maximum parsing depth exceeded; maximum parsing depth exce
+  ordered depth    500: emitted 17112 bytes ⏎ compile error: maximum parsing depth exceeded; maximum parsing depth exceeded; maximum parsing depth exce
+  ordered depth   1000: emitted 34112 bytes ⏎ compile error: maximum parsing depth exceeded; maximum parsing depth exceeded; maximum parsing depth exce
+  ordered depth  10000: emitted 340112 bytes ⏎ compile error: maximum parsing depth exceeded; maximum parsing depth exceeded; maximum parsing depth exce
+ emphasis depth     10: emitted 354 bytes ⏎ compiled 1 pages ⏎ pdf 10858 bytes
+ emphasis depth     50: emitted 1314 bytes ⏎ compile error: maximum show rule depth exceeded
+ emphasis depth    100: emitted 2514 bytes ⏎ compile error: maximum parsing depth exceeded
+ emphasis depth    500: emitted 12114 bytes ⏎ compile error: maximum parsing depth exceeded
+ emphasis depth   1000: emitted 24114 bytes ⏎ compile error: maximum parsing depth exceeded
+ emphasis depth  10000: ABORT (signal: 6 (SIGABRT)) after:    | 1 GiB stack: emitted 240114 bytes ⏎ compile error: maximum parsing depth exceeded
+     link depth     10: emitted 227 bytes ⏎ compiled 1 pages ⏎ pdf 5473 bytes
+     link depth     50: emitted 667 bytes ⏎ compiled 1 pages ⏎ pdf 5536 bytes
+     link depth    100: emitted 1217 bytes ⏎ compiled 1 pages ⏎ pdf 5623 bytes
+     link depth    500: emitted 5617 bytes ⏎ compiled 1 pages ⏎ pdf 6123 bytes
+     link depth   1000: emitted 11117 bytes ⏎ compiled 1 pages ⏎ pdf 6740 bytes
+     link depth  10000: emitted 110117 bytes ⏎ compiled 10 pages ⏎ pdf 34406 bytes
+
+timing, cold process, 5 runs each:
+short: 2 pages, 45 KB: emit 0.1ms, compile 42.7ms, pdf 2.7ms, total 45.6ms
+short: 2 pages, 45 KB: emit 0.1ms, compile 42.3ms, pdf 2.9ms, total 45.2ms
+short: 2 pages, 45 KB: emit 0.1ms, compile 38.2ms, pdf 2.9ms, total 41.3ms
+short: 2 pages, 45 KB: emit 0.1ms, compile 35.2ms, pdf 2.2ms, total 37.5ms
+short: 2 pages, 45 KB: emit 0.1ms, compile 24.9ms, pdf 2.8ms, total 27.8ms
+long: 50 pages, 637 KB: emit 0.8ms, compile 206.5ms, pdf 25.2ms, total 232.6ms
+long: 50 pages, 637 KB: emit 0.9ms, compile 196.8ms, pdf 28.5ms, total 226.2ms
+long: 50 pages, 637 KB: emit 0.9ms, compile 195.2ms, pdf 29.7ms, total 225.8ms
+long: 50 pages, 637 KB: emit 0.9ms, compile 183.8ms, pdf 23.7ms, total 208.4ms
+long: 50 pages, 637 KB: emit 0.8ms, compile 187.8ms, pdf 22.4ms, total 211.1ms

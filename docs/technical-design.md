@@ -2,7 +2,7 @@
 
 **Status:** Proposal, 2026-11-02. Requirements (R1–R26) are in the [PRD](prd.md), and terms are in the [glossary](../GLOSSARY.md).
 
-**Only Spikes 1, 1b, 2, and 3 have been run.** Other claims about how crates behave come from their documentation, and the [spikes](spikes.md) exist to test them. Choices marked *(Spike N)* could change once that spike reports.
+**Only Spike 5 hasn't been run.** Other claims about how crates behave come from their documentation, and the [spikes](spikes.md) exist to test them. Choices marked *(Spike N)* could change once that spike reports.
 
 ## Pipeline
 
@@ -225,22 +225,29 @@ The first two can come from hand-written documents, though they're rare.
 
 ## Renderer
 
-**Typst is the working choice, pending [Spike 4](spikes.md#spike-4-typst-embedding).** It runs in-process with no browser, its tagged PDF output is on by default since 0.14, and it brings pagination, footnotes, and bookmarks. Fulgur is the named fallback.
+**Typst is the Renderer ([ADR 0006](adr/0006-typst-is-the-renderer.md)), confirmed by [Spike 4](spikes.md#spike-4-typst-embedding).** It runs in-process with no browser, its tagged PDF output is on by default since 0.14, and it brings pagination, footnotes, and bookmarks.
 
 - **Parsing:** `pulldown-cmark`, with tables, task lists, strikethrough, and footnotes on. A Markdown Input never touches `markdown`, which can panic on ordinary typos ([ADR 0003](adr/0003-two-markdown-parsers.md)).
-- **Emitting:** our own walk over the events that writes Typst source. Text must be escaped so that `$5 and $6` isn't math and `Issue #42` isn't code. The mechanism (an escape table, or string literals) is *(Spike 4)*.
+- **Emitting:** our own walk over the events that writes Typst source, using only function forms, because markup such as `_..._` depends on neighboring text. Inline calls end in `;`, so following text can't become a field access or an argument.
+- **Escaping:** all text is a string literal, `#"...";`, so `$5 and $6` can't be math and `Issue #42` can't be code. Only `\`, `"`, and line endings need escaping, and there's no list of Typst syntax to maintain. An escape table gave byte-identical PDFs on real documents, but mishandled U+2028.
 
 | Markdown | Typst |
 |---|---|
-| Heading, emphasis, strong | `=`, `_..._`, `*...*` |
-| Bullet, numbered, and task lists | `-`, `+`, and a checkbox glyph in the item |
-| Code | `raw` |
-| Quote | `quote(block: true)` |
-| Table, footnote, link, image | `table`, `footnote`, `link`, `image` |
-| Thematic break | `line` |
+| Text | `#"...";` |
+| Heading, emphasis, strong, strikethrough | `#heading(level: n)[...]`, `#emph[...];`, `#strong[...];`, `#strike[...];` |
+| Bullet, numbered, and task lists | `#list(tight: b, [...])`, `#enum(start: n, tight: b, [...])`, and a checkbox glyph in the item |
+| Code | `#raw(...)`, with `block: true` and `lang` for a block |
+| Quote | `#quote(block: true)[...]` |
+| Table | `#table(columns: n, align: (...), table.header(...), ...)`, padding short rows |
+| Footnote | `#footnote[...]` with a label at its first use, then `#footnote(<label>)`. A note that references itself prints the reference as text |
+| Link, image | `#link("url")[...];`, with an empty URL printing only the text, and `#box(image("path", alt: "..."));` |
+| Hard break, thematic break | `#linebreak();`, `#line(length: 100%)` |
 | Raw HTML (Markdown Input only) | Skipped with a warning (open question in the PRD) |
 
-- **`World`:** the source is in memory, and fonts come from the binary. There are no packages or network access, the date is fixed, and files can only be read from the asset root. `typst-kit` provides building blocks for fonts, and its `World` support was reworked in 0.15.
+- **Missing glyphs:** after layout, walk the pages and report any glyph with ID 0, naming the characters and suggesting `fonts/`. Typst gives no warning, so a Chinese document would otherwise be a PDF of empty boxes with exit code 0. Bundled fonts cover Latin, Greek, Cyrillic, and Hebrew well, Arabic and Devanagari poorly, and CJK and emoji not at all.
+- **Depth:** Typst reports `maximum show rule depth exceeded` for nesting somewhere between 10 and 50 levels, which needs a hint. The emitter's own recursion needs a limit, because 10,000 nested emphases aborted it.
+
+- **`World`:** the source is in memory, and fonts come from the binary. There are no packages or network access, the date is fixed, and files can only be read from the asset root. Typst refuses `..` and SVG links itself, but we have to refuse URLs before compiling and check symlinks with `canonicalize`. `typst-kit` with only `embedded-fonts` provides the fonts.
 - **Styling:** one built-in Typst preamble gives headings, code, quotes, and tables their look. Authors can't change it except through Page Settings.
 - **PDF title:** the first level-1 heading. It comes from the Markdown rather than frontmatter so that a Project and its `--emit-md` output give the same PDF (PRD success criterion 4).
 
@@ -298,7 +305,7 @@ Versions are current as of 2026-11-02, and each was traced to its upstream proje
 | [`markdown`](https://github.com/wooorm/markdown-rs) | 1.0.0 plus six patches, as [our fork](adr/0004-fork-the-markdown-parser.md) | Dialect parsing in Stage 3 | **Medium to high.** It's the only Rust parser for MDX syntax we found, but upstream has no commits on main since 2025-04-23 and 65 open PRs, so we own any further fixes. [Spike 2](spikes.md#spike-2-dialect-parsing) confirmed the tree is what we need. Pin the fork by commit. Its own test suite hasn't been run yet |
 | [`pulldown-cmark-to-cmark`](https://github.com/Byron/pulldown-cmark-to-cmark), [`pulldown-cmark`](https://github.com/pulldown-cmark/pulldown-cmark) | 23.0.0, 0.13.6 | Tree → Markdown in Stage 5, and Markdown parsing in Stage 6 | **Low to medium.** Passed [Spike 1b](spikes.md#spike-1b-event-based-serializer) with no panics. It's on its 23rd major version and moving fast, so pin it exactly and expect upgrade work |
 | [`liquid`](https://github.com/cobalt-org/liquid-rust) | 0.26.11 | Liquid Pass and Expressions | **Medium.** Last release 2025-02. Still tended, with dependency updates through 2026-10 and a maintainer commit in 2026-07, but little new work. Aims for Shopify conformance. [Spike 3](spikes.md#spike-3-liquid-behavior) confirmed both jobs work, with [additions](#running-liquid). Pin it exactly, and carry the [11-line patch](adr/0005-sort-liquid-object-keys.md) to `liquid-core` for object order |
-| [`typst`, `typst-pdf`, `typst-kit`, `typst-assets`](https://github.com/typst/typst) | 0.15.1 | Typesetting and PDF | **Medium.** Actively developed, but expect breaking changes on upgrade. Needs Rust 1.92+. The upstream README only covers the CLI, so the library crates are confirmed through docs.rs and the changelog |
+| [`typst`, `typst-pdf`, `typst-kit`, `typst-assets`](https://github.com/typst/typst) | 0.15.1 | Typesetting and PDF | **Medium.** Actively developed, but expect breaking changes on upgrade. Needs Rust 1.92+. The upstream README only covers the CLI, so these come from git at tag `v0.15.1`, whose source matches the published crates. [Spike 4](spikes.md#spike-4-typst-embedding) confirmed them. The binary is 50 MB |
 | [`serde-saphyr`](https://github.com/bourumir-wyngs/serde-saphyr) | 2.0.0 | Frontmatter YAML | **Low to medium.** Young (created 2025-09), but fuzz-tested, with resource budgets. Rejects duplicate keys by default. Deserializing to Liquid values is *(Spike 3)* |
 | [`toml`](https://github.com/toml-rs/toml) | 1.1.8 | `page.toml` | Low. `Spanned` can give error locations |
 | [`clap`](https://github.com/clap-rs/clap) | 4.6.7 | Arguments | Low |
@@ -342,7 +349,7 @@ Common mistakes get specific hints. See [known hazards](#known-hazards).
 
 ## Determinism and safety
 
-- **Determinism (R23):** no system fonts, no network, a fixed date, and a fixed or absent PDF timestamp and identifier. Tests compare SHA-256 hashes *(Spike 4)*. Liquid needs [sorted object keys and no clock](#running-liquid).
+- **Determinism (R23):** no system fonts, no network, a fixed date, and a fixed or absent PDF timestamp and identifier. Tests compare SHA-256 hashes. [Spike 4](spikes.md#spike-4-typst-embedding) got identical bytes under every variation tried on one machine, but Typst's maintainers say floating point can make output differ across platforms ([#7683](https://github.com/typst/typst/issues/7683)), and that's untested. Liquid needs [sorted object keys and no clock](#running-liquid).
 - **No code runs:** there's no JavaScript, and in this configuration Liquid can't read files or reach the network.
 - **Files:** images and fonts must resolve inside the asset root after symlinks are resolved. Component names can't contain path separators.
 - **Not a sandbox:** a `{% for %}` loop can still use unbounded time and memory, and `(1..100000000)` writes 100 MB in about 8 seconds. Nesting depth is limited, but the tool assumes documents come from their author rather than from an untrusted source.
@@ -379,7 +386,7 @@ Common mistakes get specific hints. See [known hazards](#known-hazards).
 
 ## Known hazards
 
-Small inputs likely to break a naive implementation. Each gets a test fixture, and the failures are the reason for specific hints in error messages. Behaviors marked only with a spike other than 1, 1b, 2, and 3 haven't been observed yet.
+Small inputs likely to break a naive implementation. Each gets a test fixture, and the failures are the reason for specific hints in error messages. Behaviors marked only with Spike 5 haven't been observed yet.
 
 | Input | Problem | Handling | Spike |
 |---|---|---|---|
@@ -413,7 +420,13 @@ Small inputs likely to break a naive implementation. Each gets a test fixture, a
 | `\| {x \| upcase} \|` in a table body | Clear error at the cell's `{` | Hint: escape the pipe with a backslash, which Expansion removes before Liquid | 2, 5 |
 | A document nested 100,000 levels deep | The parser survives, but a recursive walk aborts the process, and a guard can't catch that | Depth limit in Expansion | 2 |
 | A table of 256 KB or more, perhaps from a Liquid loop | Takes 13 seconds or more to parse | Reported only. Consider a size limit | 2 |
-| `$5 and $6`, `Issue #42` | Typst reads them as math and code | Escaping in stage 7 | 4 |
+| `$5 and $6`, `Issue #42`, `// x`, `--`, `"quoted"` | Typst would read them as math, code, a comment, a dash, and a smart quote | String literals in stage 7 | 4 |
+| `你好` with the bundled fonts | Empty boxes, with no warning from Typst and exit code 0 | Report missing glyphs after layout, suggesting `fonts/` | 4 |
+| `नमस्ते`, `مرحبا` with the bundled fonts | Printed badly, with no missing glyphs, so no check can catch it | Document it, and suggest `fonts/` | 4 |
+| An SVG linking to `../secret.png` or a URL | Could read outside the root | Typst refuses it | 4 |
+| A symlink leaving the asset root | Could read outside the root | `canonicalize` in `World::file` | 4 |
+| A footnote that references itself | Label doesn't exist yet, so Typst errors | Print the reference as text | 4 |
+| Quotes or lists nested 50 levels deep | `maximum show rule depth exceeded` | Error hint | 4 |
 | A long inline code span with a line break before `[`, in LF or CRLF | Panicked `mdast_util_to_markdown`, and tests whether line breaks in code spans survive | The serializer has its own fixture for it | 1 |
 | `é\*x\*é`, `при_вет_` | Non-ASCII text beside a literal `*` or `_` corrupted or panicked the crate | The serializer has a fixture for each | 1 |
 | `https://a.b` as an Expression result | Text that GFM would turn into a link | Literal autolinks are off, so it stays text | 1 |
