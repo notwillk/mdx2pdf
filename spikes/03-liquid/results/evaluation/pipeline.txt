@@ -1,0 +1,170 @@
+What each stage does to a value. Stock markdown, no expression callback.
+
+=== yaml "x: 1\n" body "A {% raw %}{{ x }}{% endraw %} B\n"
+liquid output: "A {{ x }} B\n"
+  Root
+    Paragraph
+      Text("A ")
+      ExprText("{ x }")
+      Text(" B")
+  expression "{ x }": ERR PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {{ { x } | __capture }} ⏎   |    ^--- ⏎   | ⏎   = expected Value
+=== yaml "x: 1\n" body "{% raw %}{{ x }}{% endraw %}\n"
+liquid output: "{{ x }}\n"
+  Root
+    ExprFlow("{ x }")
+  expression "{ x }": ERR PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {{ { x } | __capture }} ⏎   |    ^--- ⏎   | ⏎   = expected Value
+=== yaml "x: 1\n" body "{% raw %}{% if y %}{% endraw %}\n"
+liquid output: "{% if y %}\n"
+  Root
+    ExprFlow("% if y %")
+  expression "% if y %": ERR PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {{ % if y % | __capture }} ⏎   |    ^--- ⏎   | ⏎   = expected Value
+=== yaml "x: 1\n" body "{% raw %}{x}{% endraw %}\n"
+liquid output: "{x}\n"
+  Root
+    ExprFlow("x")
+  expression "x": whole number:1
+=== yaml "x: 1\n" body "<A>{% raw %}{{ x }}{% endraw %}</A>\n"
+liquid output: "<A>{{ x }}</A>\n"
+  Root
+    JsxFlow(A)
+      ExprFlow("{ x }")
+  expression "{ x }": ERR PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {{ { x } | __capture }} ⏎   |    ^--- ⏎   | ⏎   = expected Value
+=== yaml "x: 1\n" body "<A>\n{% raw %}{{ x }}{% endraw %}\n</A>\n"
+liquid output: "<A>\n{{ x }}\n</A>\n"
+  Root
+    JsxFlow(A)
+      ExprFlow("{ x }")
+  expression "{ x }": ERR PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {{ { x } | __capture }} ⏎   |    ^--- ⏎   | ⏎   = expected Value
+=== yaml "x: 1\n" body "```\n{% raw %}{{ x }}{% endraw %}\n```\n"
+liquid output: "```\n{{ x }}\n```\n"
+  Root
+    Code("{{ x }}")
+=== yaml "x: 1\n" body "`{% raw %}{{ x }}{% endraw %}`\n"
+liquid output: "`{{ x }}`\n"
+  Root
+    Paragraph
+      InlineCode("{{ x }}")
+=== yaml "x: 1\n" body "{% raw %}\\{\\{ x }}{% endraw %}\n"
+liquid output: "\\{\\{ x }}\n"
+  Root
+    Paragraph
+      Text("{{ x }}")
+=== yaml "x: 1\n" body "{% raw %}\\{% if y %}{% endraw %}\n"
+liquid output: "\\{% if y %}\n"
+  Root
+    Paragraph
+      Text("{% if y %}")
+=== yaml "x: \"{y}\"\ny: secret\n" body "{{ x }}\n"
+liquid output: "{y}\n"
+  Root
+    ExprFlow("y")
+  expression "y": string:secret
+=== yaml "x: \"Save 50% {now\"\n" body "{{ x }}\n"
+liquid output: "Save 50% {now\n"
+  DIALECT ERROR at Some(1):Some(14): Unexpected end of file in expression, expected a corresponding closing brace for `{`
+=== yaml "x: \"{{ y }}\"\ny: secret\n" body "{{ x }}\n"
+liquid output: "{{ y }}\n"
+  Root
+    ExprFlow("{ y }")
+  expression "{ y }": ERR PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {{ { y } | __capture }} ⏎   |    ^--- ⏎   | ⏎   = expected Value
+=== yaml "d: 2026-01-02\n" body "{% if d < \"now\" %}before{% else %}not{% endif %}\n"
+liquid output: "not\n"
+  Root
+    Paragraph
+      Text("not")
+=== yaml "t: \"a|b\"\n" body "| h |\n|---|\n| <Card title=\"{{ t | attr }}\" /> |\n"
+liquid output: "| h |\n|---|\n| <Card title=\"a|b\" /> |\n"
+  DIALECT ERROR at Some(3):Some(17): Unexpected end of file in attribute value, expected a corresponding closing quote `"` (U+0022)
+=== yaml "t: \"a|b\"\n" body "| <Card title=\"{{ t | attr }}\" /> |\n|---|\n| b |\n"
+liquid output: "| <Card title=\"a|b\" /> |\n|---|\n| b |\n"
+  Root
+    Paragraph
+      Text("| ")
+      JsxText(Card title="a|b")
+      Text(" |\n|---|\n| b |")
+=== yaml "t: \"it's\"\n" body "<Card title='{{ t | attr }}' />\n"
+liquid output: "<Card title='it's' />\n"
+  DIALECT ERROR at Some(1):Some(18): Unexpected character `'` (U+0027) in attribute name, expected an attribute name character such as letters, digits, `$`, or `_`; `=` to initialize a value; whitespace before attributes; or the end of the tag
+=== yaml "x: a\n" body "{x\t| upcase}\n"
+liquid output: "{x\t| upcase}\n"
+  Root
+    ExprFlow("x\t| upcase")
+  expression "x\t| upcase": ERR PARSE ERROR: liquid:  --> 1:4 ⏎   | ⏎ 1 | {{ x	| upcase | __capture }} ⏎   |    ^--- ⏎   | ⏎   = expected Literal
+
+=== yaml "x: 1\n" body "A \\{\\{ x }} B\n"
+liquid output: "A \\{\\{ x }} B\n"
+  Root
+    Paragraph
+      Text("A {{ x }} B")
+=== yaml "x: 1\n" body "A \\{\\% if y %} B\n"
+liquid output: "A \\{\\% if y %} B\n"
+  Root
+    Paragraph
+      Text("A {% if y %} B")
+=== yaml "x: 1\n" body "<A>\\{\\{ x }}</A>\n"
+liquid output: "<A>\\{\\{ x }}</A>\n"
+  Root
+    Paragraph
+      JsxText(A)
+        Text("{{ x }}")
+=== yaml "x: 1\n" body "<A>\\{x}</A>\n"
+liquid output: "<A>\\{x}</A>\n"
+  Root
+    Paragraph
+      JsxText(A)
+        Text("{x}")
+=== yaml "x: 1\n" body "| h |\n|---|\n| \\{\\{ x }} |\n"
+liquid output: "| h |\n|---|\n| \\{\\{ x }} |\n"
+  Root
+    Table
+      TableRow
+        TableCell
+          Text("h")
+      TableRow
+        TableCell
+          Text("{{ x }}")
+=== yaml "x: \"a\\n\\nb\"\n" body "> {{ x }}\n"
+liquid output: "> a\n\nb\n"
+  Root
+    Blockquote
+      Paragraph
+        Text("a")
+    Paragraph
+      Text("b")
+=== yaml "x: \"a\\nb\"\n" body "> {{ x }}\n"
+liquid output: "> a\nb\n"
+  Root
+    Blockquote
+      Paragraph
+        Text("a\nb")
+=== yaml "x: \"a\\n- b\"\n" body "- {{ x }}\n"
+liquid output: "- a\n- b\n"
+  Root
+    List
+      ListItem
+        Paragraph
+          Text("a")
+      ListItem
+        Paragraph
+          Text("b")
+=== yaml "x: \"a\\nb\"\n" body "| h |\n|---|\n| {{ x }} |\n"
+liquid output: "| h |\n|---|\n| a\nb |\n"
+  Root
+    Table
+      TableRow
+        TableCell
+          Text("h")
+      TableRow
+        TableCell
+          Text("a")
+      TableRow
+        TableCell
+          Text("b")
+=== yaml "x: \"a\\n\\nb\"\n" body "> {x}\n"
+liquid output: "> {x}\n"
+  Root
+    Blockquote
+      ExprFlow("x")
+  expression "x": string:a
+
+b

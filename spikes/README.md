@@ -8,10 +8,11 @@ Throwaway experiments behind [docs/spikes.md](../docs/spikes.md), kept so the fi
 | `02-dialect/` | 2 | `cargo run --release -- run <label>`, or `deep <label>` for depth and scaling |
 | `04-typst/` | 4 | `cargo run --release -- run <label>`, or `deep <label>` for nesting and timing. `check-determinism.sh <binary> fixtures <scratch dir>` compares hashes, including in a second container. Set `SPIKE_EXTRA_FONTS` to a directory to test fonts from there. Needs `pdftotext` |
 | `03-liquid/` | 3 | `cargo run --release -- run <label>`, or `deep <label>` for depth, loops, and object order. Apply `results/object-order/btreemap.patch` to a copy of `liquid-core` 0.26.11 to get the patched run |
+| `05-expansion/` | 5 | Run `setup-vendor.sh`, which patches copies of its three dependencies. Then `cargo run --release -- run <label>`, and `render <label> <spike-typst binary>`, which needs `pdftotext`. `one <directory>` expands a single Project |
 
 Each writes to `results/<label>/`.
 
-**Before running Spike 2, turn off core dumps with `ulimit -c 0`.** Its controls abort and overflow on purpose, and a dump holds process memory, including environment variables and any tokens in them. `.gitignore` here keeps dumps out of commits, but it's better not to create them.
+**Before running Spike 2, 3, or 4, turn off core dumps with `ulimit -c 0`.** Their controls abort or overflow on purpose, and a dump holds process memory, including environment variables and any tokens in them. `.gitignore` here keeps dumps out of commits, but it's better not to create them.
 
 ## Third-party content
 

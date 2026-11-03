@@ -1,0 +1,3 @@
+rendered through Spike 4's binary, with string literals. 112 Projects that expanded: 112 compiled, 110 with all their text in pdftotext, 112 with the same PDF rendered inside the Project and elsewhere
+  TEXT MISSING design-image-path-passes-through: ["a", "b"]
+  TEXT MISSING design-non-ascii-beside-literal-punctuation: ["é*x*éandпри_вет_andこれは*です*です"]

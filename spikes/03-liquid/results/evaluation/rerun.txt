@@ -1,0 +1,11 @@
+Rebuilt from commit 0726891 and re-run, compared with results/record/summary.txt.
+Only the label and the unordered key list in one error message differ, and that list is the object-order finding.
+
+1c1
+< label: record
+---
+> label: review
+26c26
+<     RENDER ERROR: liquid: Unknown index ⏎   with: ⏎     variable=meta ⏎     requested index=missing ⏎     available indexes=obj, x, items, rows, b, z, name, f, n
+---
+>     RENDER ERROR: liquid: Unknown index ⏎   with: ⏎     variable=meta ⏎     requested index=missing ⏎     available indexes=z, rows, obj, name, x, n, f, b, items

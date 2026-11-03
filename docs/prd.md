@@ -1,6 +1,6 @@
 # Product requirements
 
-**Status:** Draft, 2026-11-02. Terms are defined in the [glossary](../GLOSSARY.md). How this gets built is in the [technical design](technical-design.md).
+**Status:** Draft, 2026-11-03. Terms are defined in the [glossary](../GLOSSARY.md). How this gets built is in the [technical design](technical-design.md).
 
 ## Problem
 
@@ -80,8 +80,8 @@ items:
 # {meta.title}
 
 {% for item in items %}
-<Callout kind="{{ item.name }}">
-Review **{{ item.name }}** before {meta.title} ships.
+<Callout kind="{{ item.name | attr }}">
+Review **{{ item.name | text }}** before {meta.title} ships.
 </Callout>
 {% endfor %}
 ```
@@ -110,9 +110,11 @@ Authors have two kinds of template syntax, each with its own job:
 | **Runs** | Before the text is read as MDX | After the text is read as MDX |
 | **Its result** | Becomes part of the source, so it can create tags | Stays data, so it can't create markup |
 
-So `{company}` is safe when `company` is `A<B`, while `{{ company }}` isn't. Loop variables exist only during the first kind, so loops use `{{ item.name }}`.
+So `{company}` is safe when `company` is `A<B`, while `{{ company }}` isn't. Loop variables exist only during the first kind, so a loop prints data through a filter that keeps it as data: `{{ item.name | text }}` in text, and `{{ item.name | attr }}` in a quoted attribute. The `|` in the example above is what keeps a name such as `A<B` from being read as a tag.
 
-Inside a table cell, escape a filter's pipe with a backslash, as in `{x \| upcase}`, because a bare `|` ends the cell.
+Inside a table cell, escape an Expression's pipe with a backslash, as in `{x \| upcase}`, because a bare `|` ends the cell. `{{ x | text }}` needs no backslash, because Liquid has already run by the time the table is read.
+
+To write braces literally, use a backslash in prose: `\{x}`, `\{\{ x }}`, and `\{\% if y %}`. In code fences and code spans, a backslash would print, so wrap `{{` and `{%` in `{% raw %}`. `{% raw %}` only stops Liquid, and its output is still read as MDX, so it doesn't make braces literal in prose.
 
 ## Command line
 
@@ -141,9 +143,10 @@ Exit codes are `0` for success, `1` for a problem with the document, and `2` for
 ### Dialect
 
 - **R5.** Read YAML frontmatter from each MDX file, available as `meta.x` and as top-level `x`. `meta` and `props` are reserved names.
-- **R6.** Run the Liquid Pass over the whole body of each MDX file before reading it as MDX. Literal `{{` and `{%` need `{% raw %}`, including inside code fences.
+- **R6.** Run the Liquid Pass over the whole body of each MDX file before reading it as MDX. In code fences and code spans, literal `{{` and `{%` need `{% raw %}`. In prose, they're written `\{\{` and `\{\%`.
 - **R7.** Evaluate Expressions using Liquid syntax, such as `{props.name | upcase}`, after reading the file as MDX. Their results can't create markup, and whitespace at the edges of a value is trimmed. In a table cell, a filter's pipe is written `\|`.
 - **R8.** Report `import`, `export`, and lowercase tags such as `<div>` as errors that explain the alternative.
+- **R27.** Provide a `text` filter, which prints a value as literal text, and an `attr` filter, which writes one safely in a quoted attribute. A value printed through either can't change the document's structure.
 
 ### Components
 
@@ -173,7 +176,7 @@ Exit codes are `0` for success, `1` for a problem with the document, and `2` for
 - **R23.** The same input and tool version produce a byte-identical PDF.
 - **R24.** Errors name the file and, where possible, the location and a suggested fix.
 - **R25.** If the result of Expansion can't be represented exactly in Markdown, report an error rather than produce a changed PDF.
-- **R26.** Report a tag with no closing `>`, and a table that a bare pipe turned into a paragraph, as errors rather than printing them as text.
+- **R26.** Report a tag with no closing `>`, a table that a bare pipe turned into a paragraph, and an Expression in a link destination or image alt text, as errors rather than printing them as text.
 
 ## Success criteria
 
@@ -181,7 +184,7 @@ Exit codes are `0` for success, `1` for a problem with the document, and `2` for
 2. The binary produces a PDF on a clean machine with no network and nothing else installed.
 3. Two runs on the same input produce byte-identical PDFs.
 4. Writing `--emit-md` into the Project directory and rendering that file with the same Page Settings produces a PDF identical to the original.
-5. Every hazard listed in the [technical design](technical-design.md#known-hazards) either works correctly or gives an error that explains the fix.
+5. Every hazard listed in the [technical design](technical-design.md#known-hazards) either works correctly, gives an error that explains the fix, or is marked there as a documented limit, as `{% if itmes %}` and `version: 1.10` are.
 
 ## Open questions
 
@@ -198,6 +201,8 @@ Each has a working default, used until someone decides otherwise.
 | Namespaced Components such as `<Ns.Sub />` | Later |
 | `{% if missing %}` with an undefined name, including a typo | Treat it as false, which is how authors test optional values and what Shopify does by default, though a typo drops content silently |
 | `{{ missing \| default: "x" }}`, which is an error in `liquid` but prints `x` in Shopify's | Leave it as an error, with a hint to use `{% if %}` |
+| `no`, `yes`, `y`, and `on` in frontmatter, which older YAML reads as booleans | Keep them as text, so `country: NO` prints `NO`. The cost is that `draft: no` is true in `{% if draft %}`, so authors use `true` and `false` |
 | Bare URLs such as `https://a.b`, which GFM can turn into links | Print as plain text. Literal autolinks are off in both the Dialect and Markdown, so authors write `[text](url)` for a link |
-| Fonts beyond the bundled ones | Load them from a `fonts/` directory in the Project. Never system fonts, because they'd break R23 |
+| Fonts beyond the bundled ones | Load them from a `fonts/` directory beside the input: in the Project, or next to a Markdown Input, so that rendering `--emit-md` output in the Project gives the same PDF (success criterion 4). Never system fonts, because they'd break R23 |
+| Text that runs off the page or overprints, such as a very long word or a table with too many columns | Warn with the page number, and still write the PDF. An error would block a document over one long line |
 | Performance and binary-size targets | Spike 4 measures them, then a person sets the bar |

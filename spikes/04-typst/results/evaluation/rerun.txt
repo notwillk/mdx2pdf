@@ -1,0 +1,21 @@
+Rebuilt from commit 0726891 in another path and re-run, compared with results/record/summary.txt.
+Only the label and file paths in error messages differ.
+
+changed lines: 10
+
+PDF hashes against results/record/determinism.txt, for the escape table and for string literals:
+baseline           3ff7dfee03065dd186cdaa77681660f6b04ef71ea049263bac386dcba580dc80
+baseline           585ef0d08c93a150aeb5a356391bd93390d6215c42f02fa3175ce65d73de9c1d
+3ff7dfee03065dd186cdaa77681660f6b04ef71ea049263bac386dcba580dc80  out/structure-table.pdf
+3ff7dfee03065dd186cdaa77681660f6b04ef71ea049263bac386dcba580dc80  out/structure-literal.pdf
+585ef0d08c93a150aeb5a356391bd93390d6215c42f02fa3175ce65d73de9c1d  out/long-table.pdf
+585ef0d08c93a150aeb5a356391bd93390d6215c42f02fa3175ce65d73de9c1d  out/long-literal.pdf
+
+strace on string literals: 0 network calls, 0 font paths
+
+Shared libraries the binary needs:
+0x0000000000000001 (NEEDED)             Shared library: [libgcc_s.so.1]
+0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]
+0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+0x0000000000000001 (NEEDED)             Shared library: [ld-linux-x86-64.so.2]
+Highest glibc symbol version: GLIBC_2.43

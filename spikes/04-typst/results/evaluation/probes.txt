@@ -1,0 +1,135 @@
+=== md/whitespace.md
+--- table source:
+#set page(paper: "a4", margin: 25mm)
+#set text(font: "Libertinus Serif", size: 11pt)
+#set document(date: none)
+one  two   three	four five six
+
+A sentence\.  Another after two spaces\, and \"quotes\" \-\- with dashes\.\.\. done\.
+
+
+--- table: 1 pages, 0 missing glyphs, warnings [], emitter errors []
+    laid out: "one two three four\u{a0}five six A sentence. Another after two spaces, and \"quotes\" -- with dashes... done. "
+--- literal source:
+#set page(paper: "a4", margin: 25mm)
+#set text(font: "Libertinus Serif", size: 11pt)
+#set document(date: none)
+#"one  two   three\tfour five six";
+
+#"A sentence.  Another after two spaces, and \"quotes\" -- with dashes... done.";
+
+
+--- literal: 1 pages, 0 missing glyphs, warnings [], emitter errors []
+    laid out: "one  two   three\tfour\u{a0}five six A sentence.  Another after two spaces, and \"quotes\" -- with dashes... done. "
+=== md/fnhead.md
+--- table: 4 pages, 0 missing glyphs, warnings [], emitter errors []
+    laid out: "Head 1 B row 1 v row 2 v row 3 v row 4 v row 5 v row 6 v row 7 v row 8 v row 9 v row 10 v row 11 v row 12 v row 13 v row 14 v row 15 v row 16 v row 17 v row 18 "
+--- literal: 4 pages, 0 missing glyphs, warnings [], emitter errors []
+    laid out: "Head 1 B row 1 v row 2 v row 3 v row 4 v row 5 v row 6 v row 7 v row 8 v row 9 v row 10 v row 11 v row 12 v row 13 v row 14 v row 15 v row 16 v row 17 v row 18 "
+=== md/overflow.md
+--- table: 3 pages, 0 missing glyphs, warnings [], emitter errors []
+    laid out: "Word:  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+--- literal: 3 pages, 0 missing glyphs, warnings [], emitter errors []
+    laid out: "Word:  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+=== md/encoded-only.md
+--- table source:
+#set page(paper: "a4", margin: 25mm)
+#set text(font: "Libertinus Serif", size: 11pt)
+#set document(date: none)
+Only encoded\: #box(image("my%20photo.png", alt: "a"));
+
+
+--- table: COMPILE ERROR file not found (searched at md/assets/my%20photo.png)
+--- literal source:
+#set page(paper: "a4", margin: 25mm)
+#set text(font: "Libertinus Serif", size: 11pt)
+#set document(date: none)
+#"Only encoded: ";#box(image("my%20photo.png", alt: "a"));
+
+
+--- literal: COMPILE ERROR file not found (searched at md/assets/my%20photo.png)
+=== md/angle-only.md
+--- table source:
+#set page(paper: "a4", margin: 25mm)
+#set text(font: "Libertinus Serif", size: 11pt)
+#set document(date: none)
+Only angle\: #box(image("my photo.png", alt: "b"));
+
+
+--- table: 1 pages, 0 missing glyphs, warnings [], emitter errors []
+    laid out: "Only angle:  "
+--- literal source:
+#set page(paper: "a4", margin: 25mm)
+#set text(font: "Libertinus Serif", size: 11pt)
+#set document(date: none)
+#"Only angle: ";#box(image("my photo.png", alt: "b"));
+
+
+--- literal: 1 pages, 0 missing glyphs, warnings [], emitter errors []
+    laid out: "Only angle:  "
+=== md/notes-everywhere.md
+--- table source:
+#set page(paper: "a4", margin: 25mm)
+#set text(font: "Libertinus Serif", size: 11pt)
+#set document(title: "Heading with note", date: none)
+#heading(level: 1)[Heading with note#[#footnote[A
+
+]<fn-0>];]
+
+#quote(block: true)[Quote with note#[#footnote[B
+
+]<fn-1>];
+
+]
+
+#list(tight: true, [item#[#footnote[C
+
+]<fn-2>];])
+
+\[link#[#footnote[D
+
+]<fn-3>];\]\(\/u\)
+
+#strike[gone#[#footnote[E
+
+]<fn-4>];];
+
+
+--- table: 1 pages, 0 missing glyphs, warnings [], emitter errors []
+    laid out: "Heading with note 1 Quote with note 2 • item 3 [link 4 ](/u) gone 5 1 A 2 B 3 C 4 D 5 E "
+--- literal source:
+#set page(paper: "a4", margin: 25mm)
+#set text(font: "Libertinus Serif", size: 11pt)
+#set document(title: "Heading with note", date: none)
+#heading(level: 1)[#"Heading with note";#[#footnote[#"A";
+
+]<fn-0>];]
+
+#quote(block: true)[#"Quote with note";#[#footnote[#"B";
+
+]<fn-1>];
+
+]
+
+#list(tight: true, [#"item";#[#footnote[#"C";
+
+]<fn-2>];])
+
+#"[";#"link";#[#footnote[#"D";
+
+]<fn-3>];#"]";#"(/u)";
+
+#strike[#"gone";#[#footnote[#"E";
+
+]<fn-4>];];
+
+
+--- literal: 1 pages, 0 missing glyphs, warnings [], emitter errors []
+    laid out: "Heading with note 1 Quote with note 2 • item 3 [link 4 ](/u) gone 5 1 A 2 B 3 C 4 D 5 E "
+
+pdftotext -layout on whitespace.md, string literal then escape table:
+one two threefour five six
+A sentence. Another after two spaces, and "quotes" -- with dashes... done.
+one two three four five six
+A sentence. Another after two spaces, and "quotes" -- with dashes... done.
+

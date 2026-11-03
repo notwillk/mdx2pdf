@@ -1,0 +1,98 @@
+design: 78 fixtures, 73 pass, 1 silently wrong, 4 other misses
+  MISS [design] props-wrong-type
+      the error didn't satisfy ["index.mdx:1", "`n`"]:
+      components/A.mdx: Couldn't read the frontmatter: error: line 2 column 3: data did not match any variant of untagged enum Value  --> <input>:2:3   | 1 | props: 2 |   type: object   |   ^ data did not match any variant of untagged enum Value 3 |   properties: 4 |     n: { type: integer }   |
+
+  MISS [design] loop-text-filter-with-hostile-values
+      expected the document:
+      Item A\<B end.
+      
+      Item \*x\* end.
+      
+      Item \{y} end.
+      
+      Item \# h end.
+      
+      Item \&#35; end.
+      
+      Item \`c\` end.
+      
+      Item a|b end.
+      
+      Item \[l\](u) end.
+      
+      Item \<B /> end.
+      
+      Item line one
+      line two end.
+      
+      | v |
+      |---|
+      | A\<B |
+      | \*x\* |
+      | \{y} |
+      | \# h |
+      | \&#35; |
+      | \`c\` |
+      | a\|b |
+      | \[l\](u) |
+      | \<B /> |
+      | line one&#10;line two |
+      got the error:
+      index.mdx, after the Liquid Pass, line 33: `<B` has no closing `>`, so it would print as text.
+          | \<B \/\> |
+      hint: A value from `{{ }}` is read as MDX. Print data with `{x}`, or with `{{ x | text }}` in a loop, and with `{{ x | attr }}` in a quoted attribute.
+
+  MISS [design] recursion-under-a-liquid-condition
+      the error didn't satisfy ["recursion", "A -> A"]:
+      components/A.mdx: Couldn't read the frontmatter: error: line 2 column 3: data did not match any variant of untagged enum Value  --> <input>:2:3   | 1 | props: 2 |   type: object   |   ^ data did not match any variant of untagged enum Value 3 |   properties: 4 |     n: { type: integer }   |
+
+  MISS [design] footnote-in-a-component-used-twice
+      expected the document:
+      Text1[^a].
+      
+      Text2[^b].
+      
+      [^a]: Note 1.
+      
+      [^b]: Note 2.
+      got the error:
+      components/N.mdx: Couldn't read the frontmatter: error: line 2 column 3: data did not match any variant of untagged enum Value  --> <input>:2:3   | 1 | props: 2 |   type: object   |   ^ data did not match any variant of untagged enum Value 3 |   properties: 4 |     n: { type: string }   |
+
+  SILENTLY WRONG [design] paragraph-then-grafted-paragraph-stay-apart
+      expected the document:
+      Before.
+      Middle.
+      After.
+      got:
+      Before.
+      
+      Middle.
+      
+      After.
+
+checks: 63 fixtures, 59 pass, 2 silently wrong, 2 other misses
+  MISS [checks] unterminated-tag-in-prose
+      the error didn't satisfy ["closing `>`"]:
+      index.mdx:1:23: Unexpected character `.` (U+002E) in attribute name, expected an attribute name character such as letters, digits, `$`, or `_`; `=` to initialize a value; whitespace before attributes; or the end of the tag
+      hint: To print a literal `<`, write `\<`.
+
+  SILENTLY WRONG [checks] a-date-from-frontmatter-still-works
+      expected the document:
+      2026 01
+      got:
+      2026-01-02 2026-01-02
+
+  MISS [checks] unclosed-lowercase-tag
+      the error didn't satisfy ["index.mdx:1"]:
+      index.mdx:2:1: Expected a closing tag for `<br>` (1:1)
+      hint: HTML isn't available. Use a Component, and write a literal `<` as `\<`.
+
+  SILENTLY WRONG [checks] the-forks-remaining-panic
+      expected an error with ["index.mdx", "crashed", "!panicked"], got the document:
+      |a||
+      |-|-|
+      
+      1. \<
+
+limits: 12 fixtures, 12 pass, 0 silently wrong, 0 other misses

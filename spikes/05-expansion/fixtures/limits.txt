@@ -1,0 +1,161 @@
+The documented limits: nothing detects these, so authors have to know about them. These
+fixtures check that each one behaves the way the docs say, rather than assuming it.
+
+@@@ raw-braces-in-prose-are-evaluated
+--- index.mdx
+---
+x: 1
+---
+{% raw %}{x}{% endraw %}
+--- expect-md
+1
+
+@@@ a-liquid-value-with-braces-is-evaluated
+--- index.mdx
+---
+x: "{y}"
+y: secret
+---
+{{ x }}
+--- expect-md
+secret
+
+@@@ multi-line-liquid-value-leaves-a-quote
+--- index.mdx
+---
+x: "a\n\nb"
+---
+> {{ x }}
+--- expect-md
+> a
+
+b
+
+@@@ multi-line-liquid-value-makes-a-list-item
+--- index.mdx
+---
+x: "a\n- b"
+---
+- {{ x }}
+--- expect-md
+- a
+- b
+
+@@@ multi-line-liquid-value-splits-a-table-row
+--- index.mdx
+---
+x: "a\nb"
+---
+| h |
+|---|
+| {{ x }} |
+--- expect-md
+| h |
+|---|
+| a |
+| b |
+
+@@@ markup-in-a-liquid-value-is-markup
+--- index.mdx
+---
+x: "*y*"
+---
+{{ x }}
+--- expect-md
+*y*
+
+@@@ entity-in-a-plain-attribute-changes
+--- index.mdx
+---
+t: "&#35;"
+---
+<Card title="{{ t }}" />
+--- components/Card.mdx
+---
+props:
+  type: object
+  properties:
+    title: { type: string }
+---
+{props.title}
+--- expect-md
+\#
+
+@@@ typo-in-an-if-drops-content
+--- index.mdx
+---
+items: [a]
+---
+Before.
+
+{% if itmes %}
+Content.
+{% endif %}
+
+After.
+--- expect-md
+Before.
+
+After.
+
+@@@ yaml-numbers-change
+--- index.mdx
+---
+version: 1.10
+zip: 02134
+quoted: "1.10"
+---
+{version} {zip} {quoted}
+--- expect-md
+1.1 2134 1.10
+
+@@@ assign-can-shadow-meta
+--- index.mdx
+---
+x: 1
+---
+{% assign meta = 1 %}{{ meta }}
+--- expect-md
+1
+
+@@@ untrimmed-liquid-splits-a-quote
+--- index.mdx
+---
+c: true
+---
+> a
+{% if c %}
+> b
+{% endif %}
+> d
+--- expect-md
+> a
+
+> b
+
+> d
+
+@@@ indented-text-is-a-paragraph
+--- index.mdx
+Text:
+
+    total
+--- expect-md
+Text:
+
+total
+
+@@@ date-filter-ignores-what-it-cant-read
+--- index.mdx
+{{ "hello" | date: "%Y" }}
+--- expect-md
+hello
+
+@@@ yes-and-no-are-text-so-both-are-true-in-an-if
+--- index.mdx
+---
+draft: no
+---
+{% if draft %}Draft{% endif %} {draft}
+--- expect-md
+Draft no

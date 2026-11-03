@@ -1,0 +1,17 @@
+20,000 hostile values, less those empty after trimming, printed in each placement. A real fixture would have far fewer hostile values.
+--- plain {{ t }}
+  paragraph: {"error": 6930, "same": 8548, "structure changed": 1789, "text changed": 2175}  first: {"error": "\\='&b{", "structure changed": "='{%%}    ", "text changed": "&#35;"}
+  heading: {"error": 6946, "same": 8244, "structure changed": 2273, "text changed": 1979}  first: {"error": "\\='&b{", "structure changed": "='{%%}    ", "text changed": "&#35;"}
+  list item: {"error": 6932, "same": 8552, "structure changed": 1788, "text changed": 2170}  first: {"error": "\\='&b{", "structure changed": "='{%%}    ", "text changed": "&#35;"}
+  quote: {"error": 6931, "same": 8547, "structure changed": 1762, "text changed": 2202}  first: {"error": "\\='&b{", "structure changed": "='{%%}    ", "text changed": "&#35;"}
+  table cell: {"error": 6960, "same": 7574, "structure changed": 3101, "text changed": 1807}  first: {"error": "\\='&b{", "structure changed": "='{%%}    ", "text changed": "&#35;"}
+  strong: {"error": 6987, "same": 8073, "structure changed": 2303, "text changed": 2079}  first: {"error": "\\='&b{", "structure changed": "='{%%}    ", "text changed": "&#35;"}
+  tag child: {"error": 7450, "panic": 2, "same": 8199, "structure changed": 1317, "text changed": 2474}  first: {"error": "\\='&b{", "panic": "--\n=\n\n}", "structure changed": "='{%%}    ", "text changed": "&#35;"}
+--- {{ t | text }}
+  paragraph: {"same": 19442}  first: {}
+  heading: {"same": 19442}  first: {}
+  list item: {"same": 19442}  first: {}
+  quote: {"same": 19442}  first: {}
+  table cell: {"same": 19442}  first: {}
+  strong: {"same": 19442}  first: {}
+  tag child: {"same": 19442}  first: {}

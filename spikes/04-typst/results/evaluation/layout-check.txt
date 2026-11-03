@@ -1,0 +1,18 @@
+After layout, with string literals: text past the page edge, and text overlapping on a line.
+overflow.md: 3 pages, 4 past the page edge, 58 overlapping on a line
+    page 1: past the edge at 1721 of 595: "xxxxxxxxxxxxxxxxxxxxxxxx"
+    page 1: past the edge at 1721 of 595: "xxxxxxxxxxxxxxxxxxxxxxxx"
+    page 1: past the edge at 1660 of 595: "xxxxxxxxxxxxxxxxxxxxxxxx"
+    page 1: past the edge at 1660 of 595: "xxxxxxxxxxxxxxxxxxxxxxxx"
+    page 1: "Column1" overlaps "Column2"
+    page 1: "Column2" overlaps "Column3"
+long.md: 50 pages, 0 past the page edge, 0 overlapping on a line
+structure.md: 2 pages, 0 past the page edge, 0 overlapping on a line
+whitespace.md: 1 pages, 0 past the page edge, 0 overlapping on a line
+fnhead.md: 4 pages, 0 past the page edge, 0 overlapping on a line
+notes-everywhere.md: 1 pages, 0 past the page edge, 1 overlapping on a line
+    page 1: "3" overlaps "•"
+
+A footnote in a table header that spans pages:
+repeating: 4 pages, the note appears 4 times
+repeat false: 4 pages, the note appears 1 times

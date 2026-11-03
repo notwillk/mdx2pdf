@@ -1,6 +1,6 @@
 # Spikes
 
-Short experiments to test the riskiest assumptions in the [technical design](technical-design.md) before building on them. Status as of 2026-11-02: Spike 1 failed, Spike 1b passed every bar except exact output and its recommendations were accepted, Spike 2 passed with required changes and its fork recommendation was accepted, Spike 3 passed three of its four bars with required changes and its patch recommendation was accepted, Spike 4 passed except that no second container was available, and Spike 5 hasn't started.
+Short experiments to test the riskiest assumptions in the [technical design](technical-design.md) before building on them. Status as of 2026-11-03: Spike 1 failed, Spike 1b passed every bar except exact output and its recommendations were accepted, Spike 2 passed with required changes and its fork recommendation was accepted, Spike 3 passed three of its four bars with required changes and its patch recommendation was accepted, Spike 4 passed except that no second container was available, a [review of Spikes 3 and 4](#evaluation-of-spikes-3-and-4) changed the design, and Spike 5 passed with required changes and its patch recommendation was accepted.
 
 ## Ground rules
 
@@ -20,11 +20,7 @@ Short experiments to test the riskiest assumptions in the [technical design](tec
 | [2](#spike-2-dialect-parsing) | Does `markdown` parse the Dialect? | 0.5 day | Work around the gaps, or change parser. **Not needed:** it passed, with required changes |
 | [3](#spike-3-liquid-behavior) | Does `liquid` behave the way the design needs? | 1 day | Custom filters, weaker errors, or a fork. **Mostly:** custom filters and a small patch, with `{% if missing %}` still silent |
 | [4](#spike-4-typst-embedding) | Can Typst embed cleanly and deterministically? | 1–2 days | Try Fulgur. **Not needed:** Typst is confirmed ([ADR 0006](adr/0006-typst-is-the-renderer.md)) |
-| [5](#spike-5-end-to-end-expansion) | Does Expansion work end to end? | 1–2 days | Revisit the expansion design |
-
-Run the remaining spikes in this order:
-
-1. **Spike 5** is the last one. It needs a working serializer and normalization.
+| [5](#spike-5-end-to-end-expansion) | Does Expansion work end to end? | 1–2 days | Revisit the expansion design. **Not needed:** it passed, with required changes |
 
 ## Spike 1: Markdown serializer
 
@@ -202,6 +198,8 @@ The two spec misses are example 173, which involves `Html` and can't reach Stage
 | Random values with whitespace and line breaks, then trimmed | 97.44–99.69% per container |
 | Random documents, GFM | 49,104 of 50,000 (98.21%) |
 | Random documents, Dialect | 45,748 of 46,546 (98.29%) |
+
+[Spike 5](#spike-5-end-to-end-expansion) later found that these suites never put emphasis and a footnote in one paragraph, and the crate refuses that. So the explanation of `Unrepresentable` below is only part of it.
 
 **Random document misses:**
 
@@ -474,7 +472,7 @@ A separate review (2026-11-02) re-ran the suites, rebuilt the fork from the save
 
 **If it fails:** Add custom tags or filters, restrict the syntax of Expressions, show rendered snippets in errors, or, for a fundamental gap, patch or fork the crate.
 
-**Findings (2026-11-02): three bars passed, one partly, with required changes.** `liquid` can do both jobs, but out of the box **it breaks R23 in two ways**, and one of those needs a patch or a restriction. **Decision:** patch it, accepted on 2026-11-02 ([ADR 0005](adr/0005-sort-liquid-object-keys.md)). Numbers are from `spikes/03-liquid/results/`. Two runs of the deterministic suites differ only in one error message's unordered key list, which is itself the second finding below.
+**Findings (2026-11-02): three bars passed, one partly, with required changes.** `liquid` can do both jobs, but out of the box **it breaks R23 in two ways**, and one of those needs a patch or a restriction. **Decision:** patch it, accepted on 2026-11-02 ([ADR 0005](adr/0005-sort-liquid-object-keys.md)). The [evaluation](#evaluation-of-spikes-3-and-4) below adds what these findings couldn't see. Numbers are from `spikes/03-liquid/results/`. Two runs of the deterministic suites differ only in one error message's unordered key list, which is itself the second finding below.
 
 | Bar | Result |
 |---|---|
@@ -612,11 +610,11 @@ That's a mock of the message we'd write, and the crate only supplies the parts. 
 
 **If it fails:** Try Fulgur with the same fixtures, emitting HTML from the same tree. Only stages 7 and 8 would change. Test Fulgur's determinism first, since its README warns that output can vary across machines. If both fail, a person needs to revisit the self-contained binary requirement.
 
-**Findings (2026-11-02): Typst is confirmed, with one bar not fully met** ([ADR 0006](adr/0006-typst-is-the-renderer.md)). Numbers are from `spikes/04-typst/results/`, and two runs of the deterministic suites matched exactly. I looked at the rendered structure pages, the script pages, and the landscape, margins, and page numbers pages myself.
+**Findings (2026-11-02): Typst is confirmed, with one bar not fully met** ([ADR 0006](adr/0006-typst-is-the-renderer.md)). The [evaluation](#evaluation-of-spikes-3-and-4) below adds what these findings couldn't see. Numbers are from `spikes/04-typst/results/`, and two runs of the deterministic suites matched exactly. I looked at the rendered structure pages, the script pages, and the landscape, margins, and page numbers pages myself.
 
 | Bar | Result |
 |---|---|
-| `pdftotext` finds every fixture string, adversarial text unchanged | **Pass.** 1,134 of 1,134 adversarial placements, and 37 of 37 structure strings. Scripts the bundled fonts lack are a separate problem, below |
+| `pdftotext` finds every fixture string, adversarial text unchanged | **Pass.** 1,134 of 1,134 adversarial placements across both escaping methods, so 567 for each, and 37 of 37 structure strings. Scripts the bundled fonts lack are a separate problem, below |
 | SHA-256 identical across two runs | **Pass.** See below |
 | SHA-256 identical in a second clean container | **Not met.** No container is possible here, so a chroot on the same machine stands in |
 | No system fonts or network | **Pass.** No socket and no font path in `strace`, and output didn't change when fonts were installed |
@@ -689,24 +687,60 @@ The spike's "1 page" is 2 here, because the mixed fixture needs 2.
 
 **Worth reporting upstream** (not reported yet): a warning when a glyph is missing from every font.
 
+### Evaluation of Spikes 3 and 4
+
+A separate review (2026-11-03) rebuilt both harnesses from the commit in another path, re-ran their main suites, and probed what neither spike tested: how stages interact, and the renderer on inputs its fixtures skipped. It didn't re-run the `deep` suites. Its evidence is in `spikes/03-liquid/results/evaluation/` and `spikes/04-typst/results/evaluation/`.
+
+**The results hold, and the decisions stand:**
+
+- **Spike 3** reproduced, apart from the unordered key list its findings describe.
+- **Spike 4** reproduced, apart from file paths in error messages. The fresh build gave the recorded PDF hashes, and `strace` showed no network or font access.
+- **ADR 0005's build steps work.** With the patch, `{% for kv in obj %}` and `{{ obj }}` each gave one order in 6 of 6 processes. The first patched run wasn't saved, and the spike's order check used a filter that doesn't exist, so `{{ obj }}` hadn't been measured. It does print in a random order on stock `liquid`.
+- **The clock:** outside tests, only the `date` filters reach it, so replacing the stock one is enough.
+
+**What it changed.** Most of the problems are between stages, so neither spike could see them. The probes used stock `markdown` and deliberately hostile values, so the rates are worst cases.
+
+| Problem | Evidence | Change |
+|---|---|---|
+| **A loop has no safe way to print data.** Loop variables only work in `{{ }}`, which reads the value as MDX, and the PRD's example did this | Of 19,442 hostile values in a paragraph, 6,930 gave errors and 3,964 came out silently different. A multi-line value leaves a quote or splits a table row, and `x: "{y}"` prints the value of `y` (`text-filter.txt`, `pipeline.txt`) | A `text` filter, with which all 19,442 came back exact in 7 placements. New R27, and the example now uses it |
+| **`{% raw %}` isn't literal outside code**, despite R6, the design, and Spike 5's fixture | `{% raw %}{x}{% endraw %}` silently prints the value of `x`, and `{% raw %}{{ x }}{% endraw %}` becomes an Expression that Liquid rejects (`pipeline.txt`) | In prose, write `\{x}`, `\{\{ x }}`, and `\{\% if y %}`, with no `raw`. Those came through as text in a paragraph, a tag's children, and a table cell. R6 now says so |
+| **The chosen string-literal escaping mishandles whitespace.** The spike's comparisons remove whitespace, and its structure, determinism, and timing runs used the escape table | A tab joins two words with no gap, and double spaces print wide (`probes.txt`) | Collapse spaces and tabs in Stage 7. That made the two methods byte-identical on a document with both, and left the recorded hashes unchanged (`whitespace-fix.txt`), so those results carry over |
+| **Long tokens run off the page, and wide tables overprint,** with exit code 0. The spike listed these as untested | A 300-character word, URL, inline code, and code line are cut off at the page edge, and 30 columns overprint. Oversized images scale correctly (`overflow-page-1.png`) | Warn after layout. An edge check found all 4 with no false alarms on 6 documents. An overlap check found the table, but also flagged a footnote marker, so it needs refining (`layout-check.txt`) |
+| **The binary isn't self-contained yet** | It needs glibc 2.43 and `libgcc_s`, so it won't start on an older system. That also limits where `check-determinism.sh` can run (`rerun.txt`) | A static Linux build in Milestone 1's CI, not yet tried. musl has its own math functions, so R23 needs checking on it |
+| **`attr` missed `\|` and `'`** | Of 20,000 values, 1,612 silently turned a table header into a paragraph, 1,612 gave errors in a table body, and 1,622 gave errors in single quotes (`attr-placements.txt`) | Escape both, after which all 20,000 came back exact and every table stayed a table |
+
+**Smaller fixes, all now in the design or the PRD:**
+
+- `![a](my%20photo.png)` isn't found, so image paths get percent-decoded.
+- A footnote in the header of a table that spans pages printed 4 times, numbered 1 to 4. `repeat: false` on that header printed it once.
+- A tab in an Expression is a parse error, so tabs outside strings become spaces before wrapping.
+- `__capture` is visible to authors, so only the Expression parser registers it.
+- PRD success criterion 5 asked every hazard to work or give an error, but some are only documented, so it now allows documented limits.
+- `fonts/` was only defined for Projects, but success criterion 4 renders a Project's Markdown as a Markdown Input, so it now means beside the input.
+- `spikes/README.md` warned about core dumps only for Spike 2, but the Spike 3 and 4 harnesses abort too. None are on disk.
+
+**Still open:** the test suites of the `markdown` fork and the `liquid` workspace. A permission check denied them earlier, and this review didn't retry.
+
 ## Spike 5: End-to-end Expansion
 
 **Question:** Does the `instantiate` design in the [technical design](technical-design.md#components) hold together from Project to Intermediate Markdown?
 
 **Why it matters:** The first four spikes test the parts. This one tests how they interact, which is where most of the [known hazards](technical-design.md#known-hazards) are.
 
-**Depends on:** Spikes 1b, 2, and 3, plus a working serializer and normalization. It stops at Intermediate Markdown, with no PDF needed.
+**Depends on:** Spikes 1b, 2, and 3, plus a working serializer and normalization. Expansion stops at Intermediate Markdown, and that output then goes through Spike 4's renderer, so the whole pipeline runs for the first time.
 
-**Method:** The smallest version of the pseudocode, run against fixture Projects, with `insta` snapshots.
+**Method:** The smallest version of the pseudocode, built on patched local copies of `markdown` and `liquid-core`, because Spike 3 used stock versions of both. Run it against fixture Projects, comparing with expected results written before the first run. This replaces the `insta` snapshots first planned for the spike, because a snapshot approves whatever came out first. The real crates can still use `insta`.
 
 **Fixtures:**
 
 - The PRD's example, which must produce the same document as the Markdown shown there.
 - Nested Components, with a Component passing children on to another.
 - `<Content />` inside a quote, a list item, and a table cell, and multi-paragraph children in each.
+- `<Content />` used twice in one Component, and with no children given.
 - Children containing Expressions, which must use the caller's scope.
-- `{% raw %}{{ x }}{% endraw %}` in children, which must stay literal.
-- Loops that generate Components.
+- `\{\{ x }}` and `\{\% if y %}` in children, which must stay literal, and `{% raw %}` in a fence, which must too.
+- Loops that generate Components, and `{{ item.x | text }}` and `{{ item.x | attr }}` in a loop, with hostile values, including in a table.
+- The documented limits, so they're observed rather than assumed: `{% raw %}{x}{% endraw %}` in prose, `{{ x }}` with `x: "{y}"`, and a multi-line `> {{ x }}`.
 - Tags alone on a line, and tags mid-sentence, including one that wrongly expands to several blocks.
 - Direct and indirect recursion.
 - Two Components defining the same reference label with different URLs, and a Component with a footnote used twice.
@@ -717,19 +751,99 @@ The spike's "1 page" is 2 here, because the mixed fixture needs 2.
 - Spike 3's required handling: `"now" | date` must give an error, `{% for kv in obj %}` must print in the same order in every process, an Expression containing `}}` outside a string must be rejected, and a parse error in an Expression must quote the author's text rather than the wrapper.
 - Every remaining row of the known hazards table.
 
+**Each fixture is one of two kinds,** because they fail in different ways:
+
+- **Design:** scope, containers, grafting, recursion, and the round trip. These decide whether the expansion design holds.
+- **Check:** whether a mistake gives the right error, and whether its message helps. A miss here is a check to fix, not a reason to rethink the design. Before the review of Spikes 3 and 4, all fixtures shared one bar, so a weak hint would have read as a design failure.
+
 **Pass:**
 
-- All fixtures match their expected output, or give the expected error.
+- All Design fixtures match their expected output, or give the expected error.
+- No Check fixture silently produces a wrong document. Each miss in the rest is listed.
 - No MDX nodes survive.
 - Re-parsing the output gives the same `pulldown-cmark` events as the normalized tree.
+- Each Project that expands also renders through Spike 4's renderer, and rendering its Intermediate Markdown as a Markdown Input gives the same PDF (PRD success criterion 4).
 
 **If it fails:** Revisit the expansion design before starting the real crates. A `<Content />` in a table cell that can't work may just need a documented limit, but a failure in scope or container handling means rethinking the design.
 
-**Findings:** _Not started._
+**Findings (2026-11-03): passed, with required changes. The expansion design holds.** One problem outside the design: `pulldown-cmark-to-cmark` refuses any paragraph with both emphasis and a footnote, so it needs a patch. **Decision:** carry the patch, accepted on 2026-11-03 ([ADR 0007](adr/0007-patch-the-serializer-for-footnotes.md)). Numbers are from `spikes/05-expansion/results/record/`. To reproduce, run `setup-vendor.sh` there, then `cargo run --release -- run <label>`, and `render <label> <spike-typst binary>`.
+
+| Bar | Result |
+|---|---|
+| All Design fixtures match | **Pass.** 103 of 103 |
+| No Check fixture silently produces a wrong document | **Pass.** 70 of 70, with no misses left to list. All 14 documented limits also behaved as documented |
+| No MDX nodes survive | **Pass.** Checked on every run, in every suite |
+| Re-parsing gives the same events | **Pass.** Checked on every run, and a mismatch is an error |
+| Each Project renders, and PRD success criterion 4 holds | **Pass.** All 112 Projects that expanded compiled in Spike 4's renderer, and each gave the same PDF rendered inside its Project and elsewhere. 110 had all their text in `pdftotext`. The other 2 are explained: image alt text doesn't print, and the bundled fonts lack Japanese |
+
+The PRD's example produces the same document as the Markdown shown there, with and without the filters (success criterion 1).
+
+**The first run wasn't clean.** It passed 144 of 153 fixtures, and `results/first-run/` keeps it. The 9 misses:
+
+| Fixtures | Cause | Kind |
+|---|---|---|
+| 3 Design | A Prop named `n`, which is the YAML key problem below | Real |
+| 1 Check | The date filter, below | Real |
+| 1 Design | My unterminated tag check missed the backslash when a text node starts with an escape | My check |
+| 1 Check | `<br>`'s error pointed at the end of the file, though the message names the tag's place | My check |
+| 1 Design, 2 Checks | My expected result or input was wrong. A tag alone on a line does split a paragraph, a period gives a parser error just as good as the expected one, and the fork's panic needs a file with no final line ending | My fixture |
+
+The fixture files say what changed and why. Later fixtures, which brought the total from 153 to 187, had results written before they first ran.
+
+**The fixtures weren't what found the worst problem.** A new suite of 100,000 valid documents did, because each one should expand. Each word in it carries a marker, so lost, repeated, or misplaced content shows up.
+
+| Problem | Evidence | Change |
+|---|---|---|
+| **Stock `pulldown-cmark-to-cmark` refuses any paragraph with both emphasis and a footnote,** such as `*w* x[^1]`, in a plain document with no Components. It validates each block alone, where the footnote has no definition, so the reference reads as text | 30,473 of 100,000 valid documents refused. Spike 1b missed it, and blamed part of its 19 refusals on something else: 12 of them were this | A small patch, `patches/footnote-validation.patch`, supplies definitions during that check, with 21 lines added and 1 removed ([ADR 0007](adr/0007-patch-the-serializer-for-footnotes.md)) |
+| **An Expression alone on a line splits its paragraph.** A sentence wrapped around `{total}` silently becomes three paragraphs, because the parser reads that line as a block | Found by probing, and not by a fixture | Lines with no blank line between them are one paragraph, as in Markdown. 8 new fixtures |
+| **`liquid`'s value type fails on non-text keys below the top level,** such as `{ n: 1 }`, `on:`, and `2024:`, with `data did not match any variant of untagged enum Value` | Any Prop named `n` failed. Spike 3 only tested such keys at the top level, where they work | Our own small type reads YAML into Liquid values, with every key as text |
+| **`y`, `no`, and `NO` silently became booleans.** A fixture's `y` printed `true`, and `country: NO` would print `false` | One Design fixture | `strict_booleans` in `serde-saphyr`, so only `true` and `false` are booleans. The cost is that `draft: no` is now text, which `{% if draft %}` reads as true. In the PRD's open questions |
+| **The stock `date` filter silently ignores its format** for `2026-01-02` and `2026-01-02T03:04:05Z`, the two ways YAML writes a date | A date from frontmatter printed unformatted | Our `date` filter reads both. Spike 3 had recorded the first as matching the stock filter, which was true but not useful |
+| **A table, quote, or list followed by a paragraph in a tight list item** would absorb that line | `<Content />` in a list item, given a table and then text | These make the list loose too, as two paragraphs already did |
+| **Footnote definitions count as blocks,** so a Component with a footnote couldn't be used mid-sentence, and children placed twice had two definitions | Fixtures | Lift definitions out per file, and keep the first of each |
+| **A `\|` in a value lost its backslash** on the way from `attr` through a table cell to a Prop | 33 of 19,442 hostile values, the only silent difference in any suite | Unescape a literal attribute only if the tag's own source has a literal `\|` |
+| **`[a]({url})` silently links to `{url}`,** and `![{x}](a.png)` keeps the braces | Written as fixtures in advance, on a hunch | Both are errors, with a hint to use `{{ }}` |
+| **The design said a `props` key is always an error,** but it's how a Component declares its Props | Writing the code | `meta` is an error everywhere. `props` is a declaration in a Component, and an error in the Entry Document |
+
+**Generated suites:**
+
+| Suite | Result |
+|---|---|
+| Hostile values through the whole pipeline: `{t}`, `{{ t \| text }}` in a loop, and `{{ t \| attr }}` to a Prop to `{props.v}`, in 23 placements | **0 silently different.** 19,373 or 19,392 of 19,442 exact per placement. The rest, 50 to 69 per placement, are errors from the serializer's known limits: a backslash before a line break, and a table cell ending in a backslash |
+| 100,000 valid documents | **99,981 expanded, with no marker lost, repeated, or out of order.** The other 19 are errors, not changed documents, from nested shapes such as a list holding an empty quote, followed by a fence, in a tight list item |
+| 100,000 random Projects, mostly invalid | 11,819 expanded and 88,143 document errors, mostly unbalanced Liquid and tags. 38 unrepresentable, 0 internal errors, 0 escaped panics, 0 with raw HTML, and 0 that changed on a second run |
+| The fork on 200,000 of Spike 2's random documents | **5 caught panics as written, and 0 with a final line ending added.** So Stage 1 adds one, and the fork has no known panic left. The guard stays |
+| Deep nesting, 200 to 10,000 levels of quotes, lists, tags, emphasis, `if`, and `for` | No aborts on a 1 GiB stack. Each gives an error or a document, in at most 2.5 seconds. The depth limit is 100 |
+| Determinism | One output in 6 separate processes, for each of 3 Projects |
+
+**Scale.** Expansion is fast, and only large tables are slow, which is the parser's superlinear behavior from Spike 2:
+
+| Liquid loop | Output | Time |
+|---|---|---|
+| 16,000 table rows | 213 KB | 4.7 s |
+| 32,000 table rows | 437 KB | 20 s |
+| 32,000 paragraphs | 981 KB | 1.6 s |
+| 6,400 uses of a Component, each read and parsed again | 76 KB | 0.14 s |
+
+So there's no need for a size limit yet, and each Component use doesn't need caching.
+
+**Errors.** The rendered snippet from Spike 3 works in practice, as in `index.mdx, after the Liquid Pass, line 1:` followed by the line. A source line is named whenever the rendered line appears once in the source, which covers most mistakes. The fixtures only check for key text in each message, so a person should still read them. All of them are in `results/record/outputs.txt`.
+
+**Recommendation: carry the serializer patch, report it upstream, and start the real crates.** Without the patch, Stage 5 fails on ordinary documents, so this needs a fix of some kind. The upstream project is active, so the patch may not last. It changes nothing else in Spike 1b's suites (`serializer-patch-on-spike-1b.txt`), though the crate's own tests haven't run with it. The alternative is to write footnote references as placeholder text before serializing and restore them afterward. That needs no patch, but it's a hack, and it wasn't tested. Writing our own serializer is the fallback if neither works. **Decision:** carry the patch, accepted on 2026-11-03. Reporting it upstream is still to do.
+
+**Not tested:**
+
+- The test suites of the `markdown` fork and the `liquid` workspace, and of `pulldown-cmark-to-cmark` with the patch.
+- The real CLI, because Spike 4's `render` stands in for it, and it doesn't yet collapse whitespace.
+- How large the stack really needs to be. These runs used 1 GiB.
+- Whether a person finds the error messages helpful. An error also names only the file, not which use of a Component led there.
+
+**Worth reporting upstream** (not reported yet): for `pulldown-cmark-to-cmark`, the footnote refusal, with the patch. For `markdown`, that its last known panic needs a file with no final line ending. For `liquid`, that `Value` can't hold a non-text key below the top level, and that `date` ignores its format for a bare date.
 
 ## After the spikes
 
-1. Record findings above, and update the [technical design](technical-design.md) and [PRD](prd.md).
-2. Write an ADR for the Renderer.
-3. Have a person set performance and size targets from the Spike 4 numbers.
-4. Move Spike 1's suites into the real tests, and start [Milestone 1](technical-design.md#delivery). `spikes/` stays as the evidence for these findings.
+1. **Done.** Findings are recorded above, and the [technical design](technical-design.md) and [PRD](prd.md) are updated.
+2. **Done.** The Renderer has [ADR 0006](adr/0006-typst-is-the-renderer.md).
+3. **Done.** The serializer patch is accepted ([ADR 0007](adr/0007-patch-the-serializer-for-footnotes.md)).
+4. Have a person set performance and size targets from the Spike 4 numbers, which only matter for a release.
+5. Move the suites from Spikes 1 and 5 into the real tests, and start [Milestone 1](technical-design.md#delivery). `spikes/` stays as the evidence for these findings.

@@ -1,0 +1,1559 @@
+Design fixtures: scope, containers, grafting, recursion, and the round trip. Expected
+results were written before the first run. Don't edit them to match a result: a surprise
+is a finding. "--- expect-md" compares events, so it means the same document, not the same
+text. "--- expect-error" lists text the error must contain, and "!" text it must not.
+
+Corrected after the first run, whose results stay in results/first-run/: paragraph-then-grafted-
+paragraph-stay-apart expected one paragraph, but a tag alone on a line interrupts a paragraph,
+so its three blocks are right. Everything from same-component-nested-in-its-own-children on was added
+after that run, with its result written before it first ran. The expression-alone-on-a-line
+fixtures come from a probe that found a real problem: see the findings.
+
+@@@ prd-example
+--- index.mdx
+---
+title: Q3 Report
+items:
+  - name: Alpha
+  - name: Beta
+---
+# {meta.title}
+
+{% for item in items %}
+<Callout kind="{{ item.name | attr }}">
+Review **{{ item.name | text }}** before {meta.title} ships.
+</Callout>
+{% endfor %}
+--- components/Callout.mdx
+---
+props:
+  type: object
+  properties:
+    kind: { type: string, default: Note }
+---
+> **{props.kind | upcase}**
+>
+> <Content />
+--- expect-md
+# Q3 Report
+
+> **ALPHA**
+>
+> Review **Alpha** before Q3 Report ships.
+
+> **BETA**
+>
+> Review **Beta** before Q3 Report ships.
+
+@@@ prd-example-without-filters
+--- index.mdx
+---
+title: Q3 Report
+items:
+  - name: Alpha
+  - name: Beta
+---
+# {meta.title}
+
+{% for item in items %}
+<Callout kind="{{ item.name }}">
+Review **{{ item.name }}** before {meta.title} ships.
+</Callout>
+{% endfor %}
+--- components/Callout.mdx
+---
+props:
+  type: object
+  properties:
+    kind: { type: string, default: Note }
+---
+> **{props.kind | upcase}**
+>
+> <Content />
+--- expect-md
+# Q3 Report
+
+> **ALPHA**
+>
+> Review **Alpha** before Q3 Report ships.
+
+> **BETA**
+>
+> Review **Beta** before Q3 Report ships.
+
+@@@ nested-components-pass-children-on
+--- index.mdx
+<Outer>
+Hello **world**.
+</Outer>
+--- components/Outer.mdx
+Before outer.
+
+<Inner>
+<Content />
+</Inner>
+
+After outer.
+--- components/Inner.mdx
+> Inner says:
+>
+> <Content />
+--- expect-md
+Before outer.
+
+> Inner says:
+>
+> Hello **world**.
+
+After outer.
+
+@@@ content-in-quote-multi-paragraph
+--- index.mdx
+<Box>
+One.
+
+Two.
+</Box>
+--- components/Box.mdx
+> Head
+>
+> <Content />
+--- expect-md
+> Head
+>
+> One.
+>
+> Two.
+
+@@@ content-in-list-item
+--- index.mdx
+<Items>
+one
+</Items>
+--- components/Items.mdx
+- <Content />
+- second
+--- expect-md
+- one
+- second
+
+@@@ content-in-list-item-multi-paragraph
+--- index.mdx
+<Items>
+one
+
+two
+</Items>
+--- components/Items.mdx
+- <Content />
+- second
+--- expect-md
+- one
+
+  two
+
+- second
+
+@@@ content-in-table-cell
+--- index.mdx
+<Cell>
+cell **text**
+</Cell>
+--- components/Cell.mdx
+| h |
+|---|
+| <Content /> |
+--- expect-md
+| h |
+|---|
+| cell **text** |
+
+@@@ content-in-table-cell-multi-paragraph
+--- index.mdx
+<Cell>
+one
+
+two
+</Cell>
+--- components/Cell.mdx
+| h |
+|---|
+| <Content /> |
+--- expect-error
+components/Cell.mdx
+several blocks
+
+@@@ content-used-twice
+--- index.mdx
+<T>
+again
+</T>
+--- components/T.mdx
+<Content />
+
+---
+
+<Content />
+--- expect-md
+again
+
+---
+
+again
+
+@@@ content-with-no-children
+--- index.mdx
+<A />
+--- components/A.mdx
+Before.
+
+<Content />
+
+After.
+--- expect-md
+Before.
+
+After.
+
+@@@ content-with-no-children-in-containers
+--- index.mdx
+<A />
+--- components/A.mdx
+> <Content />
+
+- <Content />
+- b
+--- expect-md
+>
+
+-
+- b
+
+@@@ content-in-a-heading
+--- index.mdx
+<H>
+the title
+</H>
+--- components/H.mdx
+# <Content />
+--- expect-md
+# the title
+
+@@@ children-use-the-callers-scope
+--- index.mdx
+---
+who: caller
+---
+<A>{who} and {meta.who}</A>
+--- components/A.mdx
+---
+who: component
+---
+{who} hears: <Content />
+--- expect-md
+component hears: caller and caller
+
+@@@ props-dont-reach-children
+--- index.mdx
+<A name="x">{props.name}</A>
+--- components/A.mdx
+---
+props:
+  type: object
+  properties:
+    name: { type: string }
+---
+<Content />
+--- expect-error
+index.mdx
+undefined
+name
+
+@@@ assign-doesnt-leak-out-of-a-component
+--- index.mdx
+<A />
+
+{{ y }}
+--- components/A.mdx
+{% assign y = 1 %}Set.
+--- expect-error
+index.mdx
+undefined
+`y`
+
+@@@ components-cant-read-the-entry-documents-frontmatter
+--- index.mdx
+---
+title: T
+---
+<A />
+--- components/A.mdx
+{{ title }}
+--- expect-error
+components/A.mdx
+undefined
+`title`
+
+@@@ typed-props
+--- index.mdx
+---
+xs: [a, b]
+---
+<List items={meta.xs} title="T" flag count={2} />
+--- components/List.mdx
+---
+props:
+  type: object
+  properties:
+    items: { type: array }
+    title: { type: string }
+    flag: { type: boolean }
+    count: { type: integer }
+---
+## {props.title} ({props.count})
+
+{% for i in props.items %}
+- {{ i | text }}
+{% endfor %}
+
+{% if props.flag %}
+Flagged.
+{% endif %}
+--- expect-md
+## T (2)
+
+- a
+
+- b
+
+Flagged.
+
+@@@ props-default
+--- index.mdx
+<A />
+--- components/A.mdx
+---
+props:
+  type: object
+  properties:
+    kind: { type: string, default: Note }
+---
+{props.kind}
+--- expect-md
+Note
+
+@@@ props-required-missing
+--- index.mdx
+<A />
+--- components/A.mdx
+---
+props:
+  type: object
+  required: [kind]
+  properties:
+    kind: { type: string }
+---
+{props.kind}
+--- expect-error
+index.mdx:1
+`kind`
+required
+
+@@@ props-undeclared
+--- index.mdx
+<A nope="1" />
+--- components/A.mdx
+---
+props:
+  type: object
+  properties:
+    kind: { type: string, default: x }
+---
+{props.kind}
+--- expect-error
+index.mdx:1
+`nope`
+declared
+
+@@@ props-with-no-schema
+--- index.mdx
+<A x="1" />
+--- components/A.mdx
+Hello
+--- expect-error
+index.mdx:1
+`x`
+declared
+
+@@@ props-wrong-type
+--- index.mdx
+<A n="3" />
+--- components/A.mdx
+---
+props:
+  type: object
+  properties:
+    n: { type: integer }
+---
+{props.n}
+--- expect-error
+index.mdx:1
+`n`
+integer
+
+@@@ props-enum
+--- index.mdx
+<A k="c" />
+--- components/A.mdx
+---
+props:
+  type: object
+  properties:
+    k: { type: string, enum: [a, b] }
+---
+{props.k}
+--- expect-error
+index.mdx:1
+`k`
+c
+
+@@@ spread-attribute
+--- index.mdx
+<A {...b} />
+--- components/A.mdx
+Hello
+--- expect-error
+index.mdx:1
+Spread
+
+@@@ raw-in-code
+--- index.mdx
+---
+x: 1
+---
+```
+{% raw %}{{ x }} {% if %}{% endraw %}
+```
+
+Span `{% raw %}{{ x }}{% endraw %}` here.
+--- expect-md
+```
+{{ x }} {% if %}
+```
+
+Span `{{ x }}` here.
+
+@@@ escaped-braces-in-children
+--- index.mdx
+---
+x: 1
+---
+<A>\{\{ x }} and \{\% if y %} and \{x}</A>
+--- components/A.mdx
+---
+x: 2
+---
+Text: <Content />
+--- expect-md
+Text: {{ x }} and {% if y %} and {x}
+
+@@@ raw-in-a-fence-in-children
+--- index.mdx
+---
+x: 1
+---
+<A>
+```
+{% raw %}{{ x }}{% endraw %}
+```
+</A>
+--- components/A.mdx
+<Content />
+--- expect-md
+```
+{{ x }}
+```
+
+@@@ expressions-and-tags-stay-inert-in-code
+--- index.mdx
+---
+x: 1
+---
+Span `{x}` and `<B />`.
+
+```
+{x} <B />
+```
+--- expect-md
+Span `{x}` and `<B />`.
+
+```
+{x} <B />
+```
+
+@@@ loop-generates-components
+--- index.mdx
+---
+xs: [one, two]
+---
+{% for x in xs %}
+<Card title="{{ x | attr }}" />
+{% endfor %}
+--- components/Card.mdx
+---
+props:
+  type: object
+  properties:
+    title: { type: string }
+---
+**{props.title}**
+--- expect-md
+**one**
+
+**two**
+
+@@@ loop-text-filter-with-hostile-values
+--- index.mdx
+---
+xs: ["A<B", "*x*", "{y}", "# h", "&#35;", "`c`", "a|b", "[l](u)", "<B />", "line one\nline two"]
+y: secret
+---
+{% for x in xs %}
+Item {{ x | text }} end.
+{% endfor %}
+
+| v |
+|---|
+{%- for x in xs %}
+| {{ x | text }} |
+{%- endfor %}
+--- expect-md
+Item A\<B end.
+
+Item \*x\* end.
+
+Item \{y} end.
+
+Item \# h end.
+
+Item \&#35; end.
+
+Item \`c\` end.
+
+Item a|b end.
+
+Item \[l\](u) end.
+
+Item \<B /> end.
+
+Item line one
+line two end.
+
+| v |
+|---|
+| A\<B |
+| \*x\* |
+| \{y} |
+| \# h |
+| \&#35; |
+| \`c\` |
+| a\|b |
+| \[l\](u) |
+| \<B /> |
+| line one&#10;line two |
+
+@@@ loop-attr-filter-with-hostile-values
+--- index.mdx
+---
+xs: ['Say "hi"', "it's", "AT&T", "&#35;", "a|b", "<B />", "{y}"]
+---
+{% for x in xs %}
+<Card title="{{ x | attr }}" />
+{% endfor %}
+
+| v |
+|---|
+{%- for x in xs %}
+| <Card title="{{ x | attr }}" /> |
+{%- endfor %}
+--- components/Card.mdx
+---
+props:
+  type: object
+  properties:
+    title: { type: string }
+---
+Title: {props.title}.
+--- expect-md
+Title: Say "hi".
+
+Title: it's.
+
+Title: AT&T.
+
+Title: \&#35;.
+
+Title: a|b.
+
+Title: \<B />.
+
+Title: {y}.
+
+| v |
+|---|
+| Title: Say "hi". |
+| Title: it's. |
+| Title: AT&T. |
+| Title: \&#35;. |
+| Title: a\|b. |
+| Title: \<B />. |
+| Title: {y}. |
+
+@@@ tag-alone-on-a-line-unravels
+--- index.mdx
+<Note>hi</Note>
+--- components/Note.mdx
+> <Content />
+--- expect-md
+> hi
+
+@@@ tags-on-two-lines-unravel
+--- index.mdx
+<Note>a</Note>
+<Note>b</Note>
+--- components/Note.mdx
+> <Content />
+--- expect-md
+> a
+
+> b
+
+@@@ tags-on-one-line-unravel
+--- index.mdx
+<Note>a</Note> <Note>b</Note>
+--- components/Note.mdx
+> <Content />
+--- expect-md
+> a
+
+> b
+
+@@@ tag-mid-sentence
+--- index.mdx
+Hello <Who /> there.
+--- components/Who.mdx
+**you**
+--- expect-md
+Hello **you** there.
+
+@@@ tag-mid-sentence-expanding-to-nothing
+--- index.mdx
+Foo <E /> bar
+--- components/E.mdx
+{% if false %}x{% endif %}
+--- expect-md
+Foo  bar
+
+@@@ tag-at-end-of-sentence-expanding-to-nothing
+--- index.mdx
+Foo <E />
+--- components/E.mdx
+{% if false %}x{% endif %}
+--- expect-md
+Foo
+
+@@@ tag-mid-sentence-expanding-to-several-blocks
+--- index.mdx
+Hello <Two /> there.
+--- components/Two.mdx
+One.
+
+Two.
+--- expect-error
+index.mdx:1
+several blocks
+
+@@@ tag-mid-sentence-expanding-to-a-heading
+--- index.mdx
+Hello <H /> there.
+--- components/H.mdx
+# Heading
+--- expect-error
+index.mdx:1
+paragraph
+
+@@@ recursion-direct
+--- index.mdx
+<A />
+--- components/A.mdx
+<A />
+--- expect-error
+recursion
+A -> A
+
+@@@ recursion-indirect
+--- index.mdx
+<A />
+--- components/A.mdx
+<B />
+--- components/B.mdx
+<A />
+--- expect-error
+recursion
+A -> B -> A
+
+@@@ recursion-under-a-liquid-condition
+--- index.mdx
+<A n={1} />
+--- components/A.mdx
+---
+props:
+  type: object
+  properties:
+    n: { type: integer }
+---
+{% if props.n > 0 %}
+<A n={props.n | minus: 1} />
+{% endif %}
+--- expect-error
+recursion
+A -> A
+
+@@@ same-label-in-two-components
+--- index.mdx
+<A />
+
+<B />
+--- components/A.mdx
+[docs]
+
+[docs]: /a
+--- components/B.mdx
+[docs]
+
+[docs]: /b
+--- expect-md
+[docs](/a)
+
+[docs](/b)
+
+@@@ footnote-in-a-component-used-twice
+--- index.mdx
+<N n="1" />
+
+<N n="2" />
+--- components/N.mdx
+---
+props:
+  type: object
+  properties:
+    n: { type: string }
+---
+Text{props.n}[^1].
+
+[^1]: Note {props.n}.
+--- expect-md
+Text1[^a].
+
+Text2[^b].
+
+[^a]: Note 1.
+
+[^b]: Note 2.
+
+@@@ footnote-in-an-inline-component
+--- index.mdx
+See <Ref /> here.
+--- components/Ref.mdx
+this[^1]
+
+[^1]: Note.
+--- expect-md
+See this[^a] here.
+
+[^a]: Note.
+
+@@@ footnote-in-children-placed-twice
+--- index.mdx
+<T>
+Body[^1].
+
+[^1]: N.
+</T>
+--- components/T.mdx
+<Content />
+
+<Content />
+--- expect-md
+Body[^a].
+
+Body[^a].
+
+[^a]: N.
+
+@@@ a-tree-with-no-markdown-form
+--- index.mdx
+[<L />](/c)
+--- components/L.mdx
+[x](/y)
+--- expect-error
+represented
+
+@@@ indented-text-in-a-tag-stays-text
+--- index.mdx
+<Callout>
+    total
+</Callout>
+--- components/Callout.mdx
+> <Content />
+--- expect-md
+> total
+
+@@@ comment-drops
+--- index.mdx
+a{/* inline */}b
+
+{/* block */}
+
+c
+--- expect-md
+ab
+
+c
+
+@@@ adjacent-text-merges
+--- index.mdx
+---
+x: 1
+---
+a{x}b
+--- expect-md
+a1b
+
+@@@ empty-value-in-emphasis-drops
+--- index.mdx
+---
+x: ""
+---
+a *{x}* b
+
+*{x}*
+
+c
+--- expect-md
+a  b
+
+c
+
+@@@ edge-whitespace-in-a-value-trims
+--- index.mdx
+---
+x: " a "
+---
+*{x}*
+--- expect-md
+*a*
+
+@@@ expression-values-stay-data
+--- index.mdx
+---
+a: "A<B"
+b: "*x*"
+c: "# h"
+d: "https://a.b"
+e: "[l](u)"
+f: "<B />"
+g: "{y}"
+---
+{a}
+
+{b}
+
+{c}
+
+{d}
+
+{e}
+
+{f}
+
+{g}
+--- expect-md
+A\<B
+
+\*x\*
+
+\# h
+
+https://a.b
+
+\[l\](u)
+
+\<B />
+
+{y}
+
+@@@ expression-value-with-a-blank-line
+--- index.mdx
+---
+x: "a\n\nb"
+---
+{x}
+--- expect-md
+a&#10;&#10;b
+
+@@@ expression-in-every-container
+--- index.mdx
+---
+x: V
+---
+# H {x}
+
+*e{x}* **s{x}** ~~d{x}~~ [l{x}](/u)
+
+- i{x}
+
+> q{x}
+
+| c{x} |
+|---|
+| b{x} |
+
+n[^1]
+
+[^1]: f{x}
+--- expect-md
+# H V
+
+*eV* **sV** ~~dV~~ [lV](/u)
+
+- iV
+
+> qV
+
+| cV |
+|---|
+| bV |
+
+n[^a]
+
+[^a]: fV
+
+@@@ filter-pipes-in-table-cells
+--- index.mdx
+---
+x: abc
+---
+| {x \| upcase} |
+|---|
+| {x \| upcase} |
+| <T v={x \| upcase} /> |
+--- components/T.mdx
+---
+props:
+  type: object
+  properties:
+    v: { type: string }
+---
+[{props.v}]
+--- expect-md
+| ABC |
+|---|
+| ABC |
+| \[ABC\] |
+
+@@@ brace-in-a-string-in-an-expression
+--- index.mdx
+---
+x: "a}b"
+---
+{x | replace: "}", "!"}
+--- expect-md
+a!b
+
+@@@ tab-in-an-expression
+--- index.mdx
+---
+x: a
+---
+{x	| upcase}
+--- expect-md
+A
+
+@@@ inline-tag-between-letters
+--- index.mdx
+x<B />y
+--- components/B.mdx
+*(a)*
+--- expect-md
+&#120;*(a)*&#121;
+
+@@@ quote-kept-together-around-liquid
+--- index.mdx
+---
+xs: [a, b]
+c: true
+---
+> Items:
+{%- for i in xs %}
+> - {{ i }}
+{%- endfor %}
+
+> a
+{%- if c %}
+> b
+{%- endif %}
+> d
+--- expect-md
+> Items:
+>
+> - a
+> - b
+
+> a
+> b
+> d
+
+@@@ tight-list-stays-tight
+--- index.mdx
+- a
+- b
+
+
+# h
+--- expect-md
+- a
+- b
+
+# h
+
+@@@ grafted-list-in-a-quote-in-a-list
+--- index.mdx
+<W>
+- one
+- two
+</W>
+--- components/W.mdx
+- top
+
+  > <Content />
+--- expect-md
+- top
+
+  > - one
+  > - two
+
+@@@ adjacent-lists-from-two-components
+--- index.mdx
+<L />
+
+<L />
+--- components/L.mdx
+- item
+--- expect-md
+- item
+
+* item
+
+@@@ adjacent-ordered-lists-from-two-components
+--- index.mdx
+<L />
+
+<L />
+--- components/L.mdx
+1. item
+--- expect-md
+1. item
+
+1) item
+
+@@@ list-then-paragraph-from-a-component
+--- index.mdx
+<L />
+
+Text after.
+--- components/L.mdx
+- item
+--- expect-md
+- item
+
+Text after.
+
+@@@ paragraph-then-grafted-paragraph-stay-apart
+--- index.mdx
+Before.
+<P />
+After.
+--- components/P.mdx
+Middle.
+--- expect-md
+Before.
+
+Middle.
+
+After.
+
+@@@ object-order-is-sorted
+--- index.mdx
+---
+obj: { z: 1, a: 2, m: 3 }
+---
+{% for kv in obj %}{{ kv[0] }}={{ kv[1] }} {% endfor %}
+--- expect-md
+a=2 m=3 z=1
+
+@@@ meta-and-top-level-names
+--- index.mdx
+---
+x: X
+---
+{% assign x = "Y" %}{{ x }}{{ meta.x }}{x}{meta.x}
+--- expect-md
+YXXX
+
+@@@ no-frontmatter
+--- index.mdx
+Plain *text*.
+--- expect-md
+Plain *text*.
+
+@@@ empty-frontmatter
+--- index.mdx
+---
+---
+Plain.
+--- expect-md
+Plain.
+
+@@@ crlf-file crlf
+--- index.mdx
+---
+x: 1
+---
+# {x}
+
+Line one
+line two
+--- expect-md
+# 1
+
+Line one
+line two
+
+@@@ file-with-a-bom bom
+--- index.mdx
+---
+x: 1
+---
+# {x}
+--- expect-md
+# 1
+
+@@@ components-directory-wins-over-root
+--- index.mdx
+<A />
+--- components/A.mdx
+From components.
+--- A.mdx
+From the root.
+--- expect-md
+From components.
+
+@@@ component-in-the-project-root
+--- index.mdx
+<A />
+--- A.mdx
+From the root.
+--- expect-md
+From the root.
+
+@@@ image-path-passes-through
+--- index.mdx
+![a](chart.png)
+
+<I />
+--- components/I.mdx
+![b](sub/x.png "title")
+--- expect-md
+![a](chart.png)
+
+![b](sub/x.png "title")
+
+@@@ escaped-tag-stays-text
+--- index.mdx
+\<div> and \<Card /> and \{x}
+--- expect-md
+\<div> and \<Card /> and {x}
+
+@@@ non-ascii-beside-literal-punctuation
+--- index.mdx
+é\*x\*é and при_вет_ and これは\*です\*です
+--- expect-md
+é\*x\*é and при_вет_ and これは\*です\*です
+
+@@@ a-long-code-span-with-a-line-break
+--- index.mdx
+`aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+[bbbbbbbbbbbbbbbbbbbbbbbbbbbbb`
+--- expect-md
+`aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa [bbbbbbbbbbbbbbbbbbbbbbbbbbbbb`
+
+@@@ same-component-nested-in-its-own-children
+--- index.mdx
+<N>
+<N>
+x
+</N>
+</N>
+--- components/N.mdx
+> <Content />
+--- expect-md
+> > x
+
+@@@ content-in-a-footnote-definition
+--- index.mdx
+<A>
+note text
+</A>
+--- components/A.mdx
+x[^1]
+
+[^1]: <Content />
+--- expect-md
+x[^a]
+
+[^a]: note text
+
+@@@ tag-in-a-list-item-with-block-children
+--- index.mdx
+- <A>
+  one
+
+  two
+  </A>
+- b
+--- components/A.mdx
+<Content />
+--- expect-md
+- one
+
+  two
+
+- b
+
+@@@ task-list-in-a-component
+--- index.mdx
+<T />
+--- components/T.mdx
+- [x] done
+- [ ] todo
+--- expect-md
+- [x] done
+- [ ] todo
+
+@@@ blocks-grafted-into-a-quote
+--- index.mdx
+<Q>
+# H
+
+| a |
+|---|
+| b |
+
+```rust
+fn x() {}
+```
+</Q>
+--- components/Q.mdx
+> <Content />
+--- expect-md
+> # H
+>
+> | a |
+> |---|
+> | b |
+>
+> ```rust
+> fn x() {}
+> ```
+
+@@@ component-expanding-to-nothing-between-blocks
+--- index.mdx
+A
+
+<E />
+
+B
+--- components/E.mdx
+--- expect-md
+A
+
+B
+
+@@@ hard-break-in-children
+--- index.mdx
+<A>
+one\
+two
+</A>
+--- components/A.mdx
+> <Content />
+--- expect-md
+> one\
+> two
+
+@@@ liquid-loop-in-a-component-generates-table-rows
+--- index.mdx
+---
+rows: [{a: 1, b: x}, {a: 2, b: y}]
+---
+<T rows={meta.rows} />
+--- components/T.mdx
+---
+props:
+  type: object
+  properties:
+    rows: { type: array }
+---
+| a | b |
+|---|---|
+{%- for r in props.rows %}
+| {{ r.a }} | {{ r.b | text }} |
+{%- endfor %}
+--- expect-md
+| a | b |
+|---|---|
+| 1 | x |
+| 2 | y |
+
+@@@ ordered-list-keeps-its-start
+--- index.mdx
+7. a
+8. b
+--- expect-md
+7. a
+8. b
+
+@@@ multi-line-tag
+--- index.mdx
+<Card
+  title="x"
+  note="y"
+/>
+--- components/Card.mdx
+---
+props:
+  type: object
+  properties:
+    title: { type: string }
+    note: { type: string }
+---
+{props.title} {props.note}
+--- expect-md
+x y
+
+@@@ multi-line-tag-in-a-quote
+--- index.mdx
+> <Card
+>   title="x"
+> />
+--- components/Card.mdx
+---
+props:
+  type: object
+  properties:
+    title: { type: string }
+---
+{props.title}
+--- expect-md
+> x
+
+@@@ comment-in-a-table-cell
+--- index.mdx
+| a{/* c */}b |
+|---|
+| c |
+--- expect-md
+| ab |
+|---|
+| c |
+
+@@@ entity-in-text
+--- index.mdx
+AT&amp;T &copy; 2026 &#35;1
+--- expect-md
+AT&amp;T © 2026 \#1
+
+@@@ expression-alone-on-a-line-stays-in-its-paragraph
+--- index.mdx
+---
+a: 42
+---
+The total is
+{a}
+for this year.
+--- expect-md
+The total is
+42
+for this year.
+
+@@@ expression-on-the-last-line-of-a-paragraph
+--- index.mdx
+---
+a: 42
+---
+Hello
+{a}
+--- expect-md
+Hello
+42
+
+@@@ expression-on-the-first-line-of-a-paragraph
+--- index.mdx
+---
+a: 42
+---
+{a}
+Hello
+--- expect-md
+42
+Hello
+
+@@@ two-expressions-on-two-lines
+--- index.mdx
+---
+a: 42
+b: 43
+---
+{a}
+{b}
+--- expect-md
+42
+43
+
+@@@ expression-alone-on-a-line-in-a-quote-and-a-list
+--- index.mdx
+---
+a: 42
+---
+> The total is
+> {a}
+> for this year.
+
+- The total is
+  {a}
+  for this year.
+--- expect-md
+> The total is
+> 42
+> for this year.
+
+- The total is
+  42
+  for this year.
+
+@@@ comment-alone-on-a-line-in-a-paragraph
+--- index.mdx
+One
+{/* c */}
+two
+--- expect-md
+One
+two
+
+@@@ empty-value-alone-on-a-line-in-a-paragraph
+--- index.mdx
+---
+x: ""
+---
+One
+{x}
+two
+--- expect-md
+One
+two
+
+@@@ expression-with-blank-lines-around-it-is-its-own-paragraph
+--- index.mdx
+---
+a: 42
+---
+One
+
+{a}
+
+two
+--- expect-md
+One
+
+42
+
+two
+
+@@@ tag-with-children-between-lines-stays-in-the-paragraph
+--- index.mdx
+Before.
+<P>x</P>
+After.
+--- components/P.mdx
+<Content />
+--- expect-md
+Before.
+x
+After.
+
+@@@ emphasis-and-a-footnote-in-one-paragraph
+--- index.mdx
+*w* x[^1] and **s**.
+
+[^1]: *n* here[^2].
+
+[^2]: m
+--- expect-md
+*w* x[^a] and **s**.
+
+[^a]: *n* here[^b].
+
+[^b]: m
+
+@@@ table-then-paragraph-grafted-into-a-tight-list-item
+--- index.mdx
+<B>
+one
+
+| a |
+|---|
+| b |
+
+two
+</B>
+--- components/B.mdx
+- <Content />
+- b
+--- expect-md
+- one
+
+  | a |
+  |---|
+  | b |
+
+  two
+
+- b
+
+@@@ quote-then-paragraph-grafted-into-a-tight-list-item
+--- index.mdx
+<B>
+> q
+
+two
+</B>
+--- components/B.mdx
+- <Content />
+- b
+--- expect-md
+- > q
+
+  two
+
+- b

@@ -1,0 +1,645 @@
+Check fixtures: whether a mistake gives the right error, and whether its message helps.
+Expected results were written before the first run. A miss here is a check to fix, not a
+reason to rethink the design, unless the document silently comes out wrong.
+
+Corrected after the first run, whose results stay in results/first-run/. unterminated-tag-in-prose
+expected the closing-`>` message, but its period makes the parser report the tag itself, with a
+location, which is just as good, so the silent case moved to a fixture of its own. the-forks-
+remaining-panic only panics when the file ends right after the `<`, and Stage 1 now adds a final
+line ending, so it expects the document. The frontmatter and date fixtures at the end were added
+after that run, with their results written before they first ran.
+
+@@@ unterminated-tag
+--- index.mdx
+<Card title="x"
+--- expect-error
+index.mdx:1
+closing `>`
+
+@@@ unterminated-tag-after-text
+--- index.mdx
+a <Card b={1}
+--- expect-error
+index.mdx:1
+closing `>`
+
+@@@ unterminated-tag-in-prose
+--- index.mdx
+Then A<B and more text.
+--- expect-error
+index.mdx:1
+\<
+
+@@@ liquid-value-reads-as-an-unterminated-tag
+--- index.mdx
+---
+company: "A<B and more"
+---
+{{ company }}
+--- expect-error
+closing `>`
+| text
+
+@@@ liquid-value-breaks-the-dialect
+--- index.mdx
+---
+company: "A<B, C"
+---
+{{ company }}
+--- expect-error
+after the Liquid Pass
+| text
+
+@@@ quote-in-an-attribute-value
+--- index.mdx
+---
+t: 'Say "hi"'
+---
+<Card title="{{ t }}" />
+--- expect-error
+after the Liquid Pass
+| attr
+
+@@@ table-header-with-a-bare-pipe
+--- index.mdx
+---
+x: a
+---
+| {x | upcase} |
+|---|
+| b |
+--- expect-error
+index.mdx:4
+table
+\|
+
+@@@ table-body-with-a-bare-pipe
+--- index.mdx
+---
+x: a
+---
+| h |
+|---|
+| {x | upcase} |
+--- expect-error
+index.mdx:6
+\|
+
+@@@ open-quote-on-line-1-of-a-long-file
+--- index.mdx
+{it's}
+
+Para two.
+
+Para three.
+
+Para four.
+
+Para five.
+--- expect-error
+index.mdx:1
+quote
+it's
+
+@@@ two-open-quotes-on-one-line
+--- index.mdx
+{it's} and {don't}
+--- expect-error
+index.mdx:1
+it's
+!__capture
+
+@@@ open-quotes-swallowing-blocks
+--- index.mdx
+{it's}
+
+Para one.
+
+{don't}
+--- expect-error
+index.mdx:1
+blank line
+
+@@@ expression-with-a-blank-line
+--- index.mdx
+{x
+
+y}
+--- expect-error
+index.mdx:1
+blank line
+
+@@@ clock-in-liquid
+--- index.mdx
+{{ "now" | date: "%Y" }}
+--- expect-error
+index.mdx
+clock
+frontmatter
+
+@@@ clock-in-liquid-through-a-variable
+--- index.mdx
+{% assign d = "Today" %}{{ d | date: "%Y" }}
+--- expect-error
+clock
+
+@@@ clock-in-an-expression
+--- index.mdx
+{"now" | date: "%Y"}
+--- expect-error
+index.mdx:1
+clock
+
+@@@ a-date-from-frontmatter-still-works
+--- index.mdx
+---
+d: 2026-01-02
+---
+{{ d | date: "%Y" }} {d | date: "%m"}
+--- expect-md
+2026 01
+
+@@@ expression-containing-liquid-delimiters
+--- index.mdx
+---
+name: a
+---
+{% raw %}{ {{ name }} }{% endraw %}
+--- expect-error
+{{
+!__capture
+
+@@@ expression-parse-error-quotes-the-author
+--- index.mdx
+---
+name: a
+---
+{name name}
+--- expect-error
+index.mdx:4
+name name
+!__capture
+
+@@@ raw-in-prose-becomes-an-expression
+--- index.mdx
+---
+x: 1
+---
+Show {% raw %}{{ x }}{% endraw %} here.
+--- expect-error
+\{\{
+!__capture
+
+@@@ raw-tag-in-prose-becomes-an-expression
+--- index.mdx
+Show {% raw %}{% if y %}{% endraw %} here.
+--- expect-error
+\{\%
+!__capture
+
+@@@ text-filter-in-an-expression
+--- index.mdx
+---
+x: a
+---
+{x | text}
+--- expect-error
+index.mdx:4
+already
+
+@@@ capture-isnt-available-to-authors
+--- index.mdx
+---
+x: a
+---
+{{ x | __capture }}
+--- expect-error
+__capture
+
+@@@ secrets-in-a-fence
+--- index.mdx
+```yaml
+run: echo ${{ secrets.TOKEN }}
+```
+--- expect-error
+`secrets`
+{% raw %}
+
+@@@ loop-variable-in-an-expression
+--- index.mdx
+---
+xs: [{name: a}]
+---
+{% for i in xs %}<Card title={i.name} />{% endfor %}
+--- components/Card.mdx
+---
+props:
+  type: object
+  properties:
+    title: { type: string }
+---
+{props.title}
+--- expect-error
+`i`
+{{
+
+@@@ assign-variable-in-an-expression
+--- index.mdx
+{% assign y = 2 %}{y}
+--- expect-error
+`y`
+{{
+
+@@@ mdx-style-object
+--- index.mdx
+<A style={{color: "red"}} />
+--- expect-error
+index.mdx:1
+{{
+
+@@@ mdx-style-object-with-a-known-name
+--- index.mdx
+---
+color: 1
+---
+<A style={{color}} />
+--- expect-error
+after the Liquid Pass
+style=1
+
+@@@ curly-braces-in-prose
+--- index.mdx
+Use {curly} braces
+--- expect-error
+index.mdx:1
+`curly`
+\{
+
+@@@ lowercase-tag
+--- index.mdx
+<div>x</div>
+--- expect-error
+index.mdx:1
+`div`
+Component
+
+@@@ unclosed-lowercase-tag
+--- index.mdx
+<br>
+--- expect-error
+index.mdx:1
+Component
+
+@@@ html-comment
+--- index.mdx
+Text.
+
+<!-- x -->
+--- expect-error
+index.mdx:3
+{/*
+
+@@@ autolink
+--- index.mdx
+<https://a.b>
+--- expect-error
+index.mdx:1
+[text](url)
+
+@@@ less-than-a-digit
+--- index.mdx
+a<1
+--- expect-error
+index.mdx:1
+\<
+
+@@@ generic-type-in-prose
+--- index.mdx
+Use List<String> here.
+--- expect-error
+index.mdx:1
+\<
+
+@@@ import-statement
+--- index.mdx
+import Chart from './Chart.mdx'
+--- expect-error
+index.mdx:1
+import
+Component
+
+@@@ import-with-braces
+--- index.mdx
+import {a} from "b"
+--- expect-error
+index.mdx:1
+import
+
+@@@ export-statement
+--- index.mdx
+export const a = 1
+--- expect-error
+index.mdx:1
+export
+
+@@@ import-in-prose-is-fine
+--- index.mdx
+import duties from China rose sharply
+--- expect-md
+import duties from China rose sharply
+
+@@@ export-in-prose-flagged-with-a-way-out
+--- index.mdx
+export class action lawsuits
+--- expect-error
+index.mdx:1
+&#101;xport
+
+@@@ export-escape-works
+--- index.mdx
+&#101;xport class action lawsuits
+--- expect-md
+export class action lawsuits
+
+@@@ unknown-component
+--- index.mdx
+<Nope />
+--- expect-error
+index.mdx:1
+`Nope`
+components/Nope.mdx
+
+@@@ member-name
+--- index.mdx
+<Ns.Sub />
+--- expect-error
+index.mdx:1
+Ns.Sub
+
+@@@ fragment
+--- index.mdx
+<>x</>
+--- expect-error
+index.mdx:1
+Fragment
+
+@@@ content-in-the-entry-document
+--- index.mdx
+<Content />
+--- expect-error
+index.mdx:1
+Entry Document
+
+@@@ content-with-an-attribute
+--- index.mdx
+<A />
+--- components/A.mdx
+<Content x="1" />
+--- expect-error
+components/A.mdx:1
+Content
+
+@@@ a-component-file-named-content
+--- index.mdx
+Hello
+--- components/Content.mdx
+Shadow
+--- expect-error
+Content
+reserved
+
+@@@ undefined-name
+--- index.mdx
+{{ missing }}
+--- expect-error
+index.mdx:1
+`missing`
+
+@@@ undefined-with-default
+--- index.mdx
+{{ missing | default: "x" }}
+--- expect-error
+`missing`
+{% if
+
+@@@ array-in-text
+--- index.mdx
+---
+items: [a]
+---
+{items}
+--- expect-error
+index.mdx:4
+array
+
+@@@ object-in-text
+--- index.mdx
+---
+o: { a: 1 }
+---
+A {o} B
+--- expect-error
+index.mdx:4
+object
+
+@@@ null-in-text-prints-nothing
+--- index.mdx
+---
+n: null
+---
+A{n}B
+--- expect-md
+AB
+
+@@@ frontmatter-key-meta
+--- index.mdx
+---
+meta: 1
+---
+x
+--- expect-error
+index.mdx
+`meta`
+reserved
+
+@@@ frontmatter-key-props-in-the-entry-document
+--- index.mdx
+---
+props: 1
+---
+x
+--- expect-error
+index.mdx
+`props`
+Component
+
+@@@ frontmatter-bad-yaml
+--- index.mdx
+---
+a: [1
+---
+x
+--- expect-error
+index.mdx
+
+@@@ frontmatter-unclosed
+--- index.mdx
+---
+a: 1
+x
+--- expect-error
+index.mdx
+frontmatter
+
+@@@ ampersand-in-an-attribute
+--- index.mdx
+<Card title="AT&T" />
+--- components/Card.mdx
+---
+props:
+  type: object
+  properties:
+    title: { type: string }
+---
+{props.title}
+--- expect-md
+AT&T
+
+@@@ unclosed-tag-before-a-setext-underline
+--- index.mdx
+<A>hi
+---
+</A>
+--- expect-error
+index.mdx
+
+@@@ unclosed-fence-then-another-list
+--- index.mdx
+- ```
+1. x
+--- expect-md
+- ```
+  ```
+
+1. x
+
+@@@ unterminated-tag-in-prose-with-no-punctuation
+--- index.mdx
+Then A<B and more text
+--- expect-error
+index.mdx:1
+closing `>`
+\<
+
+@@@ the-forks-remaining-panic no-final-newline
+--- index.mdx
+a||
+-|-
+1. <
+--- expect-md
+| a |  |
+|---|---|
+
+1. \<
+
+@@@ expression-in-a-link-destination
+--- index.mdx
+---
+url: /a
+---
+[a]({url})
+--- expect-error
+index.mdx:4
+{{
+
+@@@ expression-in-image-alt
+--- index.mdx
+---
+x: a
+---
+![{x}](a.png)
+--- expect-error
+index.mdx:4
+alt
+
+@@@ two-hard-breaks-in-a-row
+--- index.mdx
+a\
+\
+b
+--- expect-error
+represented
+
+@@@ table-cell-ending-in-a-backslash
+--- index.mdx
+---
+d: 'C:\dir\'
+---
+| h |
+|---|
+| {d} |
+--- expect-error
+represented
+
+@@@ frontmatter-nested-keys-that-look-typed
+--- index.mdx
+---
+a: { y: 1, n: 2, on: 3, 2024: 4, true: 5 }
+---
+{a.y} {a.n} {a.on} {a["2024"]} {a["true"]}
+--- expect-md
+1 2 3 4 5
+
+@@@ frontmatter-merge-keys
+--- index.mdx
+---
+base: &b { x: 1 }
+m:
+  <<: *b
+  y: 2
+---
+{m.x} {m.y}
+--- expect-md
+1 2
+
+@@@ frontmatter-infinity
+--- index.mdx
+---
+x: .inf
+---
+{x}
+--- expect-error
+index.mdx
+.inf
+
+@@@ frontmatter-list
+--- index.mdx
+---
+- a
+---
+x
+--- expect-error
+index.mdx
+key
+
+@@@ date-from-a-yaml-timestamp
+--- index.mdx
+---
+d: 2026-01-02T03:04:05Z
+---
+{{ d | date: "%Y %H" }}
+--- expect-md
+2026 03
+
+@@@ yes-no-y-and-n-stay-text-in-frontmatter
+--- index.mdx
+---
+countries: [NO, SE]
+a: yes
+b: y
+c: on
+d: true
+---
+{countries | join: ", "} {a} {b} {c} {d}
+--- expect-md
+NO, SE yes y on true

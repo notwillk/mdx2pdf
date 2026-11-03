@@ -1,0 +1,25 @@
+{{ obj }} in 6 stock processes:
+"kiwi4lime6apple2mango3fig5zebra1"
+"lime6apple2zebra1kiwi4mango3fig5"
+"mango3kiwi4apple2zebra1fig5lime6"
+"kiwi4mango3apple2zebra1fig5lime6"
+"lime6kiwi4zebra1mango3apple2fig5"
+"mango3fig5zebra1kiwi4lime6apple2"
+
+{{ obj }} in 6 processes with btreemap.patch, built as ADR 0005 says:
+"apple2fig5kiwi4lime6mango3zebra1"
+"apple2fig5kiwi4lime6mango3zebra1"
+"apple2fig5kiwi4lime6mango3zebra1"
+"apple2fig5kiwi4lime6mango3zebra1"
+"apple2fig5kiwi4lime6mango3zebra1"
+"apple2fig5kiwi4lime6mango3zebra1"
+
+{% for kv in obj %} in 6 processes with btreemap.patch:
+apple,fig,kiwi,lime,mango,zebra,
+apple,fig,kiwi,lime,mango,zebra,
+apple,fig,kiwi,lime,mango,zebra,
+apple,fig,kiwi,lime,mango,zebra,
+apple,fig,kiwi,lime,mango,zebra,
+apple,fig,kiwi,lime,mango,zebra,
+
+Clock: outside tests, only the date filters call to_date_time, in liquid-lib's stdlib/filters/date.rs:35 and extra/date.rs:46. liquid-core's scalar_cmp gives None for a date against a string, so {% if d < "now" %} is false and reads no clock.

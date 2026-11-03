@@ -1,0 +1,13 @@
+Spike 1b's production suites re-run with patches/footnote-validation.patch, against results/stage6 in spikes/01-serializer:
+1c1
+< label: stage6
+---
+> label: patched
+52,54c52,54
+<   J GFM     49457/50000 (98.914%)  pulldown 49531/50000 (99.062%)
+<   K Dialect 46060/46546 (98.956%)  pulldown 46132/46546 (99.111%)
+<   kinds of miss: {("J", "adapter_err"): 6, ("J", "equal"): 357, ("J", "mismatch"): 180, ("J", "panic"): 15, ("J", "serialize_err"): 19, ("J", "spread_only"): 323, ("K", "adapter_err"): 7, ("K", "equ
+---
+>   J GFM     49469/50000 (98.938%)  pulldown 49543/50000 (99.086%)
+>   K Dialect 46070/46546 (98.977%)  pulldown 46142/46546 (99.132%)
+>   kinds of miss: {("J", "adapter_err"): 6, ("J", "equal"): 357, ("J", "mismatch"): 180, ("J", "panic"): 15, ("J", "serialize_err"): 7, ("J", "spread_only"): 323, ("K", "adapter_err"): 7, ("K", "equa

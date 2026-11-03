@@ -1,0 +1,145 @@
+label: record
+
+design: 103 fixtures, 103 pass, 0 silently wrong, 0 other misses
+checks: 70 fixtures, 70 pass, 0 silently wrong, 0 other misses
+limits: 14 fixtures, 14 pass, 0 silently wrong, 0 other misses
+
+hostile values, 20,000 per placement, through the whole pipeline. Exact means the same structure and text as a plain value:
+  {t}:
+    paragraph: 19392 exact, 0 silently different, 50 errors, 0 escaped panics
+      error x50: The expanded document can't be represented exactly in Markdown, first "\\\r\n]-🍩> "
+    heading: 19392 exact, 0 silently different, 50 errors, 0 escaped panics
+      error x50: The expanded document can't be represented exactly in Markdown, first "\\\r\n]-🍩> "
+    list item: 19392 exact, 0 silently different, 50 errors, 0 escaped panics
+      error x50: The expanded document can't be represented exactly in Markdown, first "\\\r\n]-🍩> "
+    quote: 19392 exact, 0 silently different, 50 errors, 0 escaped panics
+      error x50: The expanded document can't be represented exactly in Markdown, first "\\\r\n]-🍩> "
+    table cell: 19373 exact, 0 silently different, 69 errors, 0 escaped panics
+      error x69: The expanded document can't be represented exactly in Markdown, first "-\\\n`"
+    emphasis: 19392 exact, 0 silently different, 50 errors, 0 escaped panics
+      error x50: The expanded document can't be represented exactly in Markdown, first "\\\r\n]-🍩> "
+    strong: 19392 exact, 0 silently different, 50 errors, 0 escaped panics
+      error x50: The expanded document can't be represented exactly in Markdown, first "\\\r\n]-🍩> "
+    link text: 19392 exact, 0 silently different, 50 errors, 0 escaped panics
+      error x50: The expanded document can't be represented exactly in Markdown, first "\\\r\n]-🍩> "
+    footnote: 19392 exact, 0 silently different, 50 errors, 0 escaped panics
+      error x50: The expanded document can't be represented exactly in Markdown, first "\\\r\n]-🍩> "
+  {{ t | text }} in a loop:
+    paragraph: 19392 exact, 0 silently different, 50 errors, 0 escaped panics
+      error x50: The expanded document can't be represented exactly in Markdown, first "\\\r\n]-🍩> "
+    heading: 19392 exact, 0 silently different, 50 errors, 0 escaped panics
+      error x50: The expanded document can't be represented exactly in Markdown, first "\\\r\n]-🍩> "
+    list item: 19392 exact, 0 silently different, 50 errors, 0 escaped panics
+      error x50: The expanded document can't be represented exactly in Markdown, first "\\\r\n]-🍩> "
+    quote: 19392 exact, 0 silently different, 50 errors, 0 escaped panics
+      error x50: The expanded document can't be represented exactly in Markdown, first "\\\r\n]-🍩> "
+    table cell: 19373 exact, 0 silently different, 69 errors, 0 escaped panics
+      error x69: The expanded document can't be represented exactly in Markdown, first "-\\\n`"
+    emphasis: 19392 exact, 0 silently different, 50 errors, 0 escaped panics
+      error x50: The expanded document can't be represented exactly in Markdown, first "\\\r\n]-🍩> "
+    strong: 19392 exact, 0 silently different, 50 errors, 0 escaped panics
+      error x50: The expanded document can't be represented exactly in Markdown, first "\\\r\n]-🍩> "
+    link text: 19392 exact, 0 silently different, 50 errors, 0 escaped panics
+      error x50: The expanded document can't be represented exactly in Markdown, first "\\\r\n]-🍩> "
+    footnote: 19392 exact, 0 silently different, 50 errors, 0 escaped panics
+      error x50: The expanded document can't be represented exactly in Markdown, first "\\\r\n]-🍩> "
+  {{ t | attr }} to a Prop to {props.v}:
+    block: 19392 exact, 0 silently different, 50 errors, 0 escaped panics
+      error x50: The expanded document can't be represented exactly in Markdown, first "\\\r\n]-🍩> "
+    list item: 19392 exact, 0 silently different, 50 errors, 0 escaped panics
+      error x50: The expanded document can't be represented exactly in Markdown, first "\\\r\n]-🍩> "
+    quote: 19392 exact, 0 silently different, 50 errors, 0 escaped panics
+      error x50: The expanded document can't be represented exactly in Markdown, first "\\\r\n]-🍩> "
+    table cell: 19373 exact, 0 silently different, 69 errors, 0 escaped panics
+      error x69: The expanded document can't be represented exactly in Markdown, first "-\\\n`"
+    mid-sentence: 19392 exact, 0 silently different, 50 errors, 0 escaped panics
+      error x50: The expanded document can't be represented exactly in Markdown, first "\\\r\n]-🍩> "
+
+random Projects, 100000 documents built from tags, Expressions, Liquid, and Markdown:
+  11819 expanded and round-tripped, 88143 document errors, 38 unrepresentable, 0 internal, 0 escaped panics, 0 with raw HTML, 0 changed on a second run
+  internal:
+  unrepresentable:
+    x29 expected Text
+        first: "  \n<G />two words>é|---|<M />}[^1][l](/u)| a | b |[l](/u)![a](i.png)<G />[l](/u){{ x | text }}"
+    x4 Unrepresentable.
+        first: "<L />>[^1][l](/u)|---|<D />\n[^1]: n\n1. "
+    x3 expected HardBreak, the Markdown reads as End
+        first: "<C><L />{{ x }}\\\nword|---||---|</C>"
+    x2 expected Start
+        first: "[<G />{{ x }}](/u)"
+  document errors, most common:
+    x33876 Unknown tag.
+        first: "<M />](/u)```\n```\n{%- endif %}](/u)<M />---{%- endif %}</B><F />{{ i }}~~{| a | b |<A>"
+    x14482 Unclosed block. {% endif %} tag expected.
+        first: "{x}<D />  </C><G />\n[^1]: n\n<L />{% for i in xs %}{{ x }}\n[r]: /v\n{{ x | text }}<E />\n\n## {%- if x %}<D /># {%- if x %}<E />![a](i.png)>"
+    x9209 `i` is undefined.
+        first: "{{ i | text }}<E />- {{ i }}> ```\n"
+    x7186 Unclosed block. {% endfor %} tag expected.
+        first: "{{ x }}|---|<A />word</B>![a](i.png){{ x | text }}{% for i in xs %}{{ x | text }}<Content /> <B>"
+    x5814 Unexpected closing slash 
+        first: "<E />word&amp;~~é<D /></C><B>  \\"
+    x4833 Expected a closing tag for 
+        first: "<A>> -   \n{% for i in xs %}[r]{% endfor %}> <B />"
+    x2746 Unexpected end of file in expression, expected a correspondi
+        first: "](/u)`\\\\\n\\\n<M />{| a |[r]<M v=\"p\" /># <B>\n\n\\![a](i.png)===[r]<<F />"
+    x2371 Unexpected character 
+        first: "\\| a | b |\n[^1]: n\n\\\n`[l](/u)<é<B></C>---<C><E />日本語"
+    x2046 expected Value
+        first: "</B> {% if x %}<C />[r]<Content />{{ x | text }}- 1.   <E />{{{ x | text }}\n[^1]: n\n</C>|---|---|![a](i.png)\n[r]: /v\n<M v=\"p\" />日本語"
+    x974 `<Content />` has nothing to place in the Entry Document, be
+        first: "<Content />é日本語## ~~<M v=\"p\" />>---\n"
+    x842 `<C>` is used inside a line of text, but it expands to a Tab
+        first: "<D />```\n![a](i.png)日本語> <C />---{y | upcase}"
+    x804 `<E>` is used inside a line of text or a table cell, but it 
+        first: "[^1]{{ y }}\n|---|{y | upcase}<E /># | a | b |"
+
+valid documents, 100000 built to be correct, each word carrying a marker:
+  99981 expanded, 19 refused, 0 escaped panics, 0 with a marker lost or repeated, 0 with markers out of order
+  x17 unrepresentable: Unrepresentable.
+      first: "<B>\n1. w00001w w00002w <M v=\"p\" /> **w00003w** <R /> w00004w w00005w \\* &amp; é\n\n   w00006w w00007w ![a](i.png)\n2. w00008w `w00009w` *w00010w* w00011w <M v=\"p\" />\n\n1. <D />\n\n   > | w00012w | b |\n   > |---|---|\n   > | w00013w <K>w00014w</K> w00015w {{ x | text }} w00016w <F /> **w00017w** | c |\n2. w00018w w00019w ![a](i.png) w00020w {y | upcase} *w00021w* **w00022w**\n   w00023w `w00024w`\n</B>\n\n<B>\n> <D />\n>\n> ## w00025w w00026w w00027w ![a](i.png) **w00028w** *w00029w*\n>\n> - w00030w w00031w\n> - w00032w w00033w w00034w ![a](i.png) w00035w <D /> w00036w ![a](i.png)\n>\n>   w00037w w00038w w00039w <G /> w00040w\n>\n>   <M />\n\n```\nw00041w {x} <A />\n```\n</B>\n\n[^1]: note\n"
+      says: "index.mdx: The expanded document can't be represented exactly in Markdown: Unrepresentable.\nhint: `--emit-md` shows the Markdown. Common causes are a link inside a link, two hard breaks in a row, and a table cell ending in a backslash."
+      reduced: "<B>\n*w*\n>- >\n```\n```\n</B>"
+  x2 unrepresentable: expected Text
+      first: "| w00001w | b |\n|---|---|\n| w00002w w00003w {y \\| upcase} w00004w <D /> w00005w \\* &amp; é | c |\n\n<B>\n> - | w00006w | b |\n>   |---|---|\n>   | w00007w w00008w <F /> | c |\n> - | w00009w | b |\n>   |---|---|\n>   | w00010w w00011w ![a](i.png) w00012w `w00013w` | c |\n>\n>   ```\n>   w00014w {x} <A />\n>   ```\n\n```\nw00015w {x} <A />\n```\n</B>\n\n[^1]: note\n"
+      says: "index.mdx: The expanded document can't be represented exactly in Markdown: expected Text(Boxed(\"b\")), the Markdown reads as Start(Paragraph).\nhint: `--emit-md` shows the Markdown. Common causes are a link inside a link, two hard breaks in a"
+      reduced: "<B>\n>-\n```\n```\n</B>"
+
+the fork, on Spike 2's random tokens with the callback on, 200000 documents: 5 caught panics as written, first Some("\n1. }\n\n\n[r]: /v \"t\"\n\n# {x}\n| a | b |\n|---|:-:|\n| [r]<A b={1} /><\n1. <"), and 0 with a final line ending added
+
+odd Projects:
+  no-index: ERROR: index.mdx: A Project needs an index.mdx. 
+  not-utf8: ERROR: index.mdx: This file isn't valid UTF-8. 
+  component-not-utf8: ERROR: components/A.mdx: This file isn't valid UTF-8. 
+
+determinism, each Project in 6 separate processes:
+  object-order-is-sorted: 1 distinct output(s)
+  prd-example: 1 distinct output(s)
+  footnote-in-a-component-used-twice: 1 distinct output(s)
+
+deep nesting, in a process of its own with a 1 GiB stack. It must give an error or a document, and never abort:
+     quote    200: error in 0.001s: This file is nested 203 levels deep, and the limit is 100.
+     quote   5000: error in 0.057s: This file is nested 5003 levels deep, and the limit is 100.
+      list    200: error in 0.004s: This file is nested 403 levels deep, and the limit is 100.
+      list   5000: error in 2.274s: This file is nested 10003 levels deep, and the limit is 100.
+       tag    200: error in 0.001s: This file is nested 203 levels deep, and the limit is 100.
+       tag   5000: error in 0.164s: This file is nested 5003 levels deep, and the limit is 100.
+  emphasis    200: error in 0.005s: This file is nested 403 levels deep, and the limit is 100.
+  emphasis   5000: error in 2.359s: This file is nested 10003 levels deep, and the limit is 100.
+        if   5000: 1 bytes of Markdown in 0.072s
+        if  10000: 1 bytes of Markdown in 0.247s
+       for   5000: 1 bytes of Markdown in 0.112s
+       for  10000: 1 bytes of Markdown in 0.467s
+
+scale:
+       table   1000: 11904 bytes of Markdown in 0.015s
+       table   4000: 50904 bytes of Markdown in 0.213s
+       table  16000: 212905 bytes of Markdown in 4.668s
+       table  32000: 436905 bytes of Markdown in 19.977s
+       prose   1000: 28891 bytes of Markdown in 0.007s
+       prose   4000: 118891 bytes of Markdown in 0.043s
+       prose  16000: 484892 bytes of Markdown in 0.376s
+       prose  32000: 980892 bytes of Markdown in 1.566s
+  components    100: 990 bytes of Markdown in 0.001s
+  components    400: 4290 bytes of Markdown in 0.005s
+  components   1600: 18091 bytes of Markdown in 0.036s
+  components   6400: 75691 bytes of Markdown in 0.141s

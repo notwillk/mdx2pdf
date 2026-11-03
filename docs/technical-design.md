@@ -1,8 +1,8 @@
 # Technical design
 
-**Status:** Proposal, 2026-11-02. Requirements (R1–R26) are in the [PRD](prd.md), and terms are in the [glossary](../GLOSSARY.md).
+**Status:** Proposal, 2026-11-03. Requirements (R1–R27) are in the [PRD](prd.md), and terms are in the [glossary](../GLOSSARY.md).
 
-**Only Spike 5 hasn't been run.** Other claims about how crates behave come from their documentation, and the [spikes](spikes.md) exist to test them. Choices marked *(Spike N)* could change once that spike reports.
+**All the spikes have run,** and the [findings](spikes.md) hold the evidence for how crates behave.
 
 ## Pipeline
 
@@ -25,7 +25,7 @@ flowchart TD
 
 | # | Stage | Input → output | Notes |
 |---|---|---|---|
-| 1 | Split frontmatter | File text → YAML values, body | Done on raw text, because Liquid needs the values before anything is parsed. Line endings are normalized to LF here |
+| 1 | Split frontmatter | File text → YAML values, body | Done on raw text, because Liquid needs the values before anything is parsed. Line endings are normalized to LF here, a byte order mark comes off, and a final line ending is added, because the fork's last known panic needs a file without one |
 | 2 | Liquid Pass | Body + scope → text | Runs on text, so it can generate tags. See [running Liquid](#running-liquid) |
 | 3 | Parse Dialect | Text → tree | With `markdown`, inside a [panic guard](#parsing-the-dialect). JSX and expressions on; ESM, HTML, indented code, and literal autolinks off |
 | 4 | Expand | Tree → normalized tree with no MDX nodes | Runs stages 1–3 again for each Component use. See [normalization](#normalization) |
@@ -47,11 +47,17 @@ Liquid and Expressions run at different times ([ADR 0001](adr/0001-liquid-is-the
 | Can create tags | Yes | No |
 | Sees | Scope plus Liquid loop variables | Scope only |
 
-The scope for a file is `{ ...frontmatter, meta: frontmatter, props }`. A frontmatter key named `meta` or `props` is an error.
+The scope for a file is `{ ...frontmatter, meta: frontmatter, props }`. A frontmatter key named `meta` is an error. A key named `props` declares a Component's Props, so it isn't part of Meta, and it's an error in the Entry Document.
 
 An Expression's result becomes a text node, and the serializer escapes it. That's why `{company}` is safe with `A<B`. Whitespace at the edges of the value is trimmed, because `*{x}*` with ` a ` has no Markdown spelling otherwise. In text position, strings, numbers, and booleans print, and arrays or objects are an error.
 
 Expression text goes to Liquid unchanged, with two exceptions from [Spike 2](spikes.md#spike-2-dialect-parsing): in a table cell, `\|` becomes `|`, and continuation lines of a multi-line Expression lose up to two leading spaces. Only a string spanning lines could notice the second one, so it's documented rather than fixed. `{/* comment */}` is dropped rather than evaluated.
+
+**Printing data in a loop.** Loop variables are gone by the time Expressions run, so a loop can only print through `{{ }}`, and that reads the value as MDX. Of 19,442 hostile values printed that way in a paragraph, 6,930 gave errors and 3,964 came out silently different. So the `text` filter escapes a value for MDX source, and `{{ item.name | text }}` is the safe spelling. Plain `{{ }}` stays for generating markup on purpose.
+
+**Literal braces.** `{% raw %}` only stops Liquid, and its output still goes to the Dialect parser. So in prose, `{% raw %}{{ x }}{% endraw %}` becomes the Expression `{ x }`, which is an error, and `{% raw %}{x}{% endraw %}` prints the value of `x`. Authors write `\{x}`, `\{\{ x }}`, and `\{\% if y %}` instead, which Liquid leaves alone and the Dialect reads as text. `{% raw %}` is for code fences and code spans, where a backslash would print.
+
+**An Expression alone on a line.** The parser reads this as a block, even between lines of text, so a sentence wrapped around `{total}` would silently become three paragraphs. Expansion joins it back: lines with no blank line between them are one paragraph, as in Markdown. An Expression with blank lines around it is its own paragraph. If its value is empty, or it's a comment, its line disappears.
 
 ## Running Liquid
 
@@ -60,9 +66,12 @@ Expression text goes to Liquid unchanged, with two exceptions from [Spike 2](spi
 | Addition | Why |
 |---|---|
 | Sorted object keys, through an 11-line `liquid-core` patch ([ADR 0005](adr/0005-sort-liquid-object-keys.md)) | `Object` is a `HashMap` with a random seed, so `{% for kv in obj %}` printed 6 different orders in 6 runs, which breaks R23. Keys come out alphabetically, so authors who need an order use a list |
-| Our own `date` filter, registered after the standard library | `"now" \| date` reads the clock, which also breaks R23. Ours rejects `now` and `today`, and otherwise matches the stock filter |
-| An `attr` filter, for `<Card title="{{ t \| attr }}" />` | It escapes `&`, `"`, and line endings. All 20,000 random values came back exact. Without it, 15% came back silently different |
-| Typed evaluation: render `{{ EXPR \| __capture }}`, and keep the value the filter receives | There's no public function to evaluate an expression. It worked for arrays, objects, numbers, booleans, and null |
+| Our own `date` filter, registered after the standard library | `"now" \| date` reads the clock, which also breaks R23. Ours rejects `now` and `today`. It also reads `2026-01-02` and `2026-01-02T03:04:05Z`, the two ways YAML writes a date, where the stock filter silently ignores its format |
+| Our own small type for reading YAML into Liquid values, with `strict_booleans` on | `liquid`'s `Value` fails on non-text keys below the top level, such as `{ n: 1 }` and `2024:`. Default YAML rules also turn `y` and `NO` into booleans |
+| An `attr` filter, for `<Card title="{{ t \| attr }}" />` | It escapes `&`, `"`, `'`, `\|`, and line endings. All 20,000 random values came back exact in double and single quotes, tables, lists, and nested tags. Without it, 15% came back silently different. Without `\|`, 8% of values turned a table header into a paragraph |
+| A `text` filter, for `{{ item.name \| text }}` | It trims the value, backslash-escapes ASCII punctuation, and encodes tabs and line endings. Of 19,442 hostile values through the whole pipeline, none came out silently different in 9 placements, and about 0.3% were errors from the serializer's known limits |
+| Typed evaluation: render `{{ EXPR \| __capture }}`, and keep the value the filter receives | There's no public function to evaluate an expression. It worked for arrays, objects, numbers, booleans, and null. Register `__capture` only on the Expression parser, so authors don't see it |
+| Before wrapping an Expression, turn tabs outside strings into spaces | Liquid's grammar only accepts spaces and line endings, so `{x<tab>\| upcase}` is otherwise a parse error |
 | Before wrapping an Expression, reject `}}`, `{{`, `%}`, and `{%` outside strings. After, require empty output and exactly one capture | Otherwise `"" }}{{ name` escapes the wrapper. With this, none of 20 attempts got through, and no valid Expression was flagged |
 | Rewrite Expression errors to show the author's text | Parse errors quote the wrapper and count columns from it |
 | A `catch_unwind` guard, on a thread with a large stack | One panic in 200,000 random templates. Nesting blocks 5,000 to 10,000 deep aborts on the default stack, and a guard can't catch that, but a 1 GiB stack contained it. The right size hasn't been measured |
@@ -72,7 +81,7 @@ Expression text goes to Liquid unchanged, with two exceptions from [Spike 2](spi
 
 **Whitespace:** write `{%- if c %}` and `{%- endif %}` inside a block quote. `{%- -%}` on both sides glues lines together, and no trimming splits the quote. Hyphens don't trim tabs.
 
-**Frontmatter numbers:** YAML turns `1.10` into `1.1`, `007` into `7`, and `yes` into `true`, and authors have to quote those values. That's the behavior of YAML, not a bug to fix, but it belongs in the docs.
+**Frontmatter values:** YAML turns `1.10` into `1.1` and `007` into `7`, and authors have to quote those values. That's the behavior of YAML, not a bug to fix, but it belongs in the docs. Only `true` and `false` are booleans, so `country: NO` stays text. So does `draft: no`, which `{% if draft %}` reads as true.
 
 ## Parsing the Dialect
 
@@ -83,15 +92,16 @@ Expression text goes to Liquid unchanged, with two exceptions from [Spike 2](spi
 | A `catch_unwind` guard, a silent panic hook, and `panic = "unwind"` in the release profile | Stock 1.0.0 panics on ordinary typos. All 1,591 panics in 250,000 random documents were caught |
 | A tree validator for parent-child rules | Stock 1.0.0 can put a list directly in a list. Spike 2 flagged 15 in 100,000 Markdown-heavy documents |
 | An `mdx_expression_parse` callback that tracks quotes and braces | Plain brace matching ends `{x \| replace: "}", ""}` early, with no error |
-| For a quote left open in an Expression: re-parse with plain brace matching to find it, and reject an Expression containing a blank line | With the callback alone, `{it's}` on line 1 reports its error at the end of the file, and a stray quote can swallow later blocks into one Expression. *(Untested, Spike 5)* |
+| For a quote left open in an Expression: re-parse with plain brace matching to find it, and reject an Expression containing a blank line | With the callback alone, `{it's}` on line 1 reports its error at the end of the file, and a stray quote can swallow later blocks into one Expression |
 | An ESM check on top-level paragraphs, reading the source line | With ESM off, `import` prints as text. It has to report statements but not prose such as `import duties from China rose`, so `from` must be followed by a quote (R8). It still flags `export class action lawsuits`, and the hint is to write `&#101;xport`, because a backslash would print |
-| An unterminated tag check on text nodes: `<` plus an uppercase letter, unless escaped | `<Card title="x"` with no `>` silently prints as text. *(Untested, Spike 5)* |
-| A check for paragraphs containing a table delimiter row | An unescaped filter pipe in a table's header can silently turn the whole table into a paragraph. *(Untested, Spike 5)* |
+| An unterminated tag check on text nodes: `<` plus an uppercase letter, unless escaped. A text node that starts with an escape starts after its backslash, so the check has to look back | `<Card title="x"` with no `>` silently prints as text |
+| A check for paragraphs containing a table delimiter row | An unescaped filter pipe in a table's header can silently turn the whole table into a paragraph |
+| A check for Expressions in link destinations and image alt text | `[a]({url})` would silently link to `{url}` |
 | A depth limit on Expansion | The parser survives nesting 100,000 deep, but a recursive walk aborted the process there, and a guard can't catch that. The limit should sit well below that, since Expansion's frames are bigger |
 
-**Fork.** Stage 3 uses a small fork, built from six patches taken from open upstream PRs ([ADR 0004](adr/0004-fork-the-markdown-parser.md)). It takes panics from 1,591 to 5 and malformed trees from 15 to 0, with or without the expression callback, and it fixes `<Card title="AT&T" />`. The guard and validator stay, because the fork still has a rare panic. The counts in the table above are for stock 1.0.0.
+**Fork.** Stage 3 uses a small fork, built from six patches taken from open upstream PRs ([ADR 0004](adr/0004-fork-the-markdown-parser.md)). It takes panics from 1,591 to 5 and malformed trees from 15 to 0, with or without the expression callback, and it fixes `<Card title="AT&T" />`. The guard and validator stay, because the fork may have panics nobody has found. The counts in the table above are for stock 1.0.0.
 
-**Size limits.** Parsing is superlinear: a 256 KB table takes about 13 seconds, and neither the fork nor the callback changes that much. Normal documents are well below that, but Liquid loops can generate large tables.
+**Size limits.** Parsing is superlinear for large tables, and neither the fork nor the callback changes that much. Through the whole pipeline, a table of 213 KB takes about 5 seconds, and one of 437 KB about 20. A document of 981 KB of paragraphs takes 1.6 seconds. So there's no limit for now.
 
 ### How the Dialect differs from Markdown
 
@@ -125,6 +135,8 @@ props:
 - **Props schema:** a small JSON-Schema-like subset (`type`, `properties`, `required`, `default`, `enum`), validated by our own code. A tag passing an undeclared Prop is an error.
 - **Scope:** each file has its own Meta and Props, and nothing leaks into parents or siblings.
 - **Liquid:** partials aren't configured, so Components are the only reuse mechanism and templates can't read files.
+- **Placing children:** inline children in a block position get a paragraph, as `<Note>hi</Note>` does at `> <Content />`. In an inline position, children must be inline or a single paragraph, whose contents are used, and anything else is an error with the location.
+- **`Content`:** the name is reserved, so a `Content.mdx` file is an error, and `<Content />` takes no attributes or children.
 
 Expansion treats the Entry Document as a Component with no Props and no children:
 
@@ -148,7 +160,7 @@ instantiate(file, props, children):
 Three properties follow from this shape:
 
 1. **Children keep the caller's scope.** They're expanded before the Component runs, and written by the caller.
-2. **No text goes through Liquid twice.** Children are tree nodes grafted in after the Component's Liquid Pass, so they aren't in its scope. `{% raw %}{{ x }}{% endraw %}` in a child stays literal.
+2. **Children don't go through the Component's Liquid.** They're tree nodes grafted in after the Component's Liquid Pass, so they aren't in its scope. `\{\{ x }}` in a child stays literal. This doesn't stop a value from being evaluated twice in one file: `{{ x }}` with `x: "{y}"` prints `{y}`, which the Dialect reads as an Expression, so `{{ x | text }}` is the safe spelling.
 3. **Containers work automatically.** `> <Content />` holds whole blocks inside the quote, and the serializer adds the `> ` prefixes.
 
 Recursion is detected by keeping the stack of Components being instantiated, and it reports the chain. Any Component already on the stack is an error, even if Liquid conditions would have stopped the recursion.
@@ -169,11 +181,15 @@ The cost is needing a reliable serializer, and that the intermediate doesn't pre
 
 ### Inline and block tags
 
-`<Note>hi</Note>` alone on a line parses as inline JSX in a paragraph. As in `@mdx-js/mdx`, a paragraph holding only tags and whitespace, including line breaks, is unwrapped to block level ("unraveling"). The parser already does this for some shapes, such as `<A /> <B />`, but not for `<A>x</A> <B>y</B>`. A Component used mid-sentence must expand to a single paragraph, whose contents replace the tag. Anything else is an error with the location *(Spike 5)*.
+`<Note>hi</Note>` alone on a line parses as inline JSX in a paragraph. As in `@mdx-js/mdx`, a paragraph holding only tags and whitespace, including line breaks, is unwrapped to block level ("unraveling"). The parser already does this for some shapes, such as `<A /> <B />`, but not for `<A>x</A> <B>y</B>`. A Component used mid-sentence must expand to a single paragraph, whose contents replace the tag. Anything else is an error with the location.
+
+A self-closing tag alone on a line is a block even between lines of text, so `Before.`, `<P />`, `After.` on three lines are three blocks. That's unlike [an Expression alone on a line](#evaluation), because a tag on its own line usually is a block. `<P>x</P>` between lines stays inline in the paragraph.
 
 ## Serialization
 
 **Stage 5 uses `pulldown-cmark-to-cmark`**, through an adapter of about 340 lines from our tree to its events. In [Spike 1b](spikes.md#after-the-decisions) it round-tripped all 624 spec inputs that parse in the Dialect and all 47 curated cases, where `mdast_util_to_markdown` [failed Spike 1](spikes.md#spike-1-markdown-serializer) with 93.40% of spec examples and 33 of 47. If it becomes a problem, the fallback is our own serializer, covering only the 21 node kinds left after normalization.
+
+**It carries a patch ([ADR 0007](adr/0007-patch-the-serializer-for-footnotes.md)).** Stock 23.0.0 refuses any paragraph with both emphasis and a footnote, such as `*w* x[^1]`, because it validates each block alone, where a footnote has no definition. [Spike 5](spikes.md#spike-5-end-to-end-expansion) saw 30,473 of 100,000 valid documents refused. A small patch, `spikes/05-expansion/patches/footnote-validation.patch`, supplies the definitions during that check, and the only other change in Spike 1b's suites was clearing 12 more of these refusals. Reporting it upstream is still to do.
 
 **Block quote text:** it writes block quotes with a fixed ` > ` prefix, so `--emit-md` output can look slightly odd. That's accepted: PRD success criterion 1 asks for the same document, not the same text. A 5-line change to the crate would fix it, which is worth offering upstream as an option.
 
@@ -186,11 +202,12 @@ Before serializing, Expansion puts its tree into the form a parser would produce
 | Work out tight or loose from source lines | In `localize_references`, per file | `markdown` reports a list as spread when two blank lines follow it. A tight list would turn loose, and the serializer would add a dummy `[cmark-loose-1]: <>` definition to force that |
 | Resolve link and image references to inline form | In `localize_references`, per file | If two Components define `[docs]:` with different URLs, the first definition wins, so one link silently points to the wrong URL. The re-parsed tree still matches, so the [round-trip check](#round-trip-check) can't catch this |
 | Make footnote identifiers unique | In `localize_references`, per use | A Component with a footnote used twice would otherwise produce duplicate identifiers |
+| Lift footnote definitions out, and keep the first of each | In `localize_references`, per file. They go at the end of the document | A definition would otherwise count as a block, so a Component with a footnote couldn't be used mid-sentence, and children placed twice would define it twice |
 | Merge adjacent text nodes | On the final tree | `a{x}b` makes three text nodes, and re-parsing gives one, so the check would fail on every inline Expression |
 | Drop empty nodes | On the final tree | `*{x}*` with an empty value would serialize to a literal `**` |
 | Trim spaces at the edges of paragraphs, headings, and table cells | On the final tree | A tag that expands to nothing can leave `Foo `, and a parser strips that space |
 | Drop hard breaks at the edges of a container, and trim the spaces around the rest | On the final tree | A leading hard break would be written as a blank line, and a parser strips those spaces |
-| Decide tight or loose per list, and make a list loose if an item holds two paragraphs in a row | On the final tree | CommonMark decides this per list. Two paragraphs grafted into a tight item would otherwise merge into `onetwo` |
+| Decide tight or loose per list, and make a list loose if an item holds two paragraphs in a row, or a table, quote, or list followed by a paragraph, table, quote, or list | On the final tree | CommonMark decides this per list. Two paragraphs grafted into a tight item would otherwise merge into `onetwo`, and a table would absorb the line after it |
 | Pad short table rows with empty cells | On the final tree | GFM treats a short row and a padded one the same |
 | Apply CommonMark's code span rule | In the adapter | `markdown` keeps a line break in a code span's value, where `pulldown-cmark` gives a space, so the two would never compare equal |
 
@@ -220,6 +237,7 @@ Spike 1's failure cases, such as non-ASCII text, nested emphasis, and a `|` in a
 - A table cell ending in a `\`, such as `C:\dir\`.
 - A literal `\` just before a line break in a value.
 - A value with a non-breaking space at the edge of emphasis.
+- A few deep shapes, such as a list holding an empty quote, followed by a fence, in a tight list item. These were 19 of 100,000 valid documents in Spike 5.
 
 The first two can come from hand-written documents, though they're rare.
 
@@ -229,7 +247,7 @@ The first two can come from hand-written documents, though they're rare.
 
 - **Parsing:** `pulldown-cmark`, with tables, task lists, strikethrough, and footnotes on. A Markdown Input never touches `markdown`, which can panic on ordinary typos ([ADR 0003](adr/0003-two-markdown-parsers.md)).
 - **Emitting:** our own walk over the events that writes Typst source, using only function forms, because markup such as `_..._` depends on neighboring text. Inline calls end in `;`, so following text can't become a field access or an argument.
-- **Escaping:** all text is a string literal, `#"...";`, so `$5 and $6` can't be math and `Issue #42` can't be code. Only `\`, `"`, and line endings need escaping, and there's no list of Typst syntax to maintain. An escape table gave byte-identical PDFs on real documents, but mishandled U+2028.
+- **Escaping:** all text is a string literal, `#"...";`, so `$5 and $6` can't be math and `Issue #42` can't be code. Only `\`, `"`, and line endings need escaping, and there's no list of Typst syntax to maintain. Runs of spaces and tabs collapse to one space first, because a string literal keeps them: a tab joined two words with no gap, and double spaces printed wide. An escape table mishandled U+2028, and otherwise gave byte-identical PDFs on every document tried, including one with tabs and double spaces.
 
 | Markdown | Typst |
 |---|---|
@@ -238,13 +256,14 @@ The first two can come from hand-written documents, though they're rare.
 | Bullet, numbered, and task lists | `#list(tight: b, [...])`, `#enum(start: n, tight: b, [...])`, and a checkbox glyph in the item |
 | Code | `#raw(...)`, with `block: true` and `lang` for a block |
 | Quote | `#quote(block: true)[...]` |
-| Table | `#table(columns: n, align: (...), table.header(...), ...)`, padding short rows |
+| Table | `#table(columns: n, align: (...), table.header(...), ...)`, padding short rows. With a footnote in the header, `table.header(repeat: false, ...)`, because a repeated header prints the note again on each page with a new number |
 | Footnote | `#footnote[...]` with a label at its first use, then `#footnote(<label>)`. A note that references itself prints the reference as text |
-| Link, image | `#link("url")[...];`, with an empty URL printing only the text, and `#box(image("path", alt: "..."));` |
+| Link, image | `#link("url")[...];`, with an empty URL printing only the text, and `#box(image("path", alt: "..."));`, with the path percent-decoded, because `my%20photo.png` otherwise isn't found |
 | Hard break, thematic break | `#linebreak();`, `#line(length: 100%)` |
 | Raw HTML (Markdown Input only) | Skipped with a warning (open question in the PRD) |
 
 - **Missing glyphs:** after layout, walk the pages and report any glyph with ID 0, naming the characters and suggesting `fonts/`. Typst gives no warning, so a Chinese document would otherwise be a PDF of empty boxes with exit code 0. Bundled fonts cover Latin, Greek, Cyrillic, and Hebrew well, Arabic and Devanagari poorly, and CJK and emoji not at all.
+- **Overflow:** after layout, warn about text past the page edge, naming the page. Typst gives no warning, so a very long word, URL, or code line is cut off with exit code 0. Comparing each text item's right edge with the page width found all 4 cases and raised no false alarms on 6 documents. A table with too many columns stays inside the page, but its cells overprint. A check for overlapping text on one line found that too, but it also flagged a footnote marker, so it needs refining. Oversized images scale to fit, so they need nothing.
 - **Depth:** Typst reports `maximum show rule depth exceeded` for nesting somewhere between 10 and 50 levels, which needs a hint. The emitter's own recursion needs a limit, because 10,000 nested emphases aborted it.
 
 - **`World`:** the source is in memory, and fonts come from the binary. There are no packages or network access, the date is fixed, and files can only be read from the asset root. Typst refuses `..` and SVG links itself, but we have to refuse URLs before compiling and check symlinks with `canonicalize`. `typst-kit` with only `embedded-fonts` provides the fonts.
@@ -303,10 +322,10 @@ Versions are current as of 2026-11-02, and each was traced to its upstream proje
 | Crate | Version | Use | Risk and notes |
 |---|---|---|---|
 | [`markdown`](https://github.com/wooorm/markdown-rs) | 1.0.0 plus six patches, as [our fork](adr/0004-fork-the-markdown-parser.md) | Dialect parsing in Stage 3 | **Medium to high.** It's the only Rust parser for MDX syntax we found, but upstream has no commits on main since 2025-04-23 and 65 open PRs, so we own any further fixes. [Spike 2](spikes.md#spike-2-dialect-parsing) confirmed the tree is what we need. Pin the fork by commit. Its own test suite hasn't been run yet |
-| [`pulldown-cmark-to-cmark`](https://github.com/Byron/pulldown-cmark-to-cmark), [`pulldown-cmark`](https://github.com/pulldown-cmark/pulldown-cmark) | 23.0.0, 0.13.6 | Tree → Markdown in Stage 5, and Markdown parsing in Stage 6 | **Low to medium.** Passed [Spike 1b](spikes.md#spike-1b-event-based-serializer) with no panics. It's on its 23rd major version and moving fast, so pin it exactly and expect upgrade work |
+| [`pulldown-cmark-to-cmark`](https://github.com/Byron/pulldown-cmark-to-cmark), [`pulldown-cmark`](https://github.com/pulldown-cmark/pulldown-cmark) | 23.0.0, 0.13.6 | Tree → Markdown in Stage 5, and Markdown parsing in Stage 6 | **Low to medium.** Passed [Spike 1b](spikes.md#spike-1b-event-based-serializer) with no panics, and carries [a patch](adr/0007-patch-the-serializer-for-footnotes.md) for footnotes. It's on its 23rd major version and moving fast, so pin it exactly and expect upgrade work |
 | [`liquid`](https://github.com/cobalt-org/liquid-rust) | 0.26.11 | Liquid Pass and Expressions | **Medium.** Last release 2025-02. Still tended, with dependency updates through 2026-10 and a maintainer commit in 2026-07, but little new work. Aims for Shopify conformance. [Spike 3](spikes.md#spike-3-liquid-behavior) confirmed both jobs work, with [additions](#running-liquid). Pin it exactly, and carry the [11-line patch](adr/0005-sort-liquid-object-keys.md) to `liquid-core` for object order |
 | [`typst`, `typst-pdf`, `typst-kit`, `typst-assets`](https://github.com/typst/typst) | 0.15.1 | Typesetting and PDF | **Medium.** Actively developed, but expect breaking changes on upgrade. Needs Rust 1.92+. The upstream README only covers the CLI, so these come from git at tag `v0.15.1`, whose source matches the published crates. [Spike 4](spikes.md#spike-4-typst-embedding) confirmed them. The binary is 50 MB |
-| [`serde-saphyr`](https://github.com/bourumir-wyngs/serde-saphyr) | 2.0.0 | Frontmatter YAML | **Low to medium.** Young (created 2025-09), but fuzz-tested, with resource budgets. Rejects duplicate keys by default. Deserializing to Liquid values is *(Spike 3)* |
+| [`serde-saphyr`](https://github.com/bourumir-wyngs/serde-saphyr) | 2.0.0 | Frontmatter YAML | **Low to medium.** Young (created 2025-09), but fuzz-tested, with resource budgets. Rejects duplicate keys by default. [Spike 5](spikes.md#spike-5-end-to-end-expansion) reads it through our own small type with `strict_booleans` on, and that needs `serde` too |
 | [`toml`](https://github.com/toml-rs/toml) | 1.1.8 | `page.toml` | Low. `Spanned` can give error locations |
 | [`clap`](https://github.com/clap-rs/clap) | 4.6.7 | Arguments | Low |
 | [`miette`](https://github.com/zkat/miette), [`thiserror`](https://github.com/dtolnay/thiserror) | 7.6.0, 2.0.21 | Errors with source spans | Low |
@@ -352,6 +371,7 @@ Common mistakes get specific hints. See [known hazards](#known-hazards).
 - **Determinism (R23):** no system fonts, no network, a fixed date, and a fixed or absent PDF timestamp and identifier. Tests compare SHA-256 hashes. [Spike 4](spikes.md#spike-4-typst-embedding) got identical bytes under every variation tried on one machine, but Typst's maintainers say floating point can make output differ across platforms ([#7683](https://github.com/typst/typst/issues/7683)), and that's untested. Liquid needs [sorted object keys and no clock](#running-liquid).
 - **No code runs:** there's no JavaScript, and in this configuration Liquid can't read files or reach the network.
 - **Files:** images and fonts must resolve inside the asset root after symlinks are resolved. Component names can't contain path separators.
+- **Self-contained (R21):** a default Linux build links glibc dynamically, and Spike 4's needs glibc 2.43, so it won't start on an older system. Linux releases need a static build, such as `x86_64-unknown-linux-musl`. That hasn't been tried, and because musl has its own math functions, R23 needs checking on it.
 - **Not a sandbox:** a `{% for %}` loop can still use unbounded time and memory, and `(1..100000000)` writes 100 MB in about 8 seconds. Nesting depth is limited, but the tool assumes documents come from their author rather than from an untrusted source.
 
 ## Testing
@@ -386,22 +406,36 @@ Common mistakes get specific hints. See [known hazards](#known-hazards).
 
 ## Known hazards
 
-Small inputs likely to break a naive implementation. Each gets a test fixture, and the failures are the reason for specific hints in error messages. Behaviors marked only with Spike 5 haven't been observed yet.
+Small inputs likely to break a naive implementation. Each gets a test fixture, and the failures are the reason for specific hints in error messages. A row whose handling says "Documented" is a documented limit under PRD success criterion 5: nothing detects it, so authors have to know about it.
 
 | Input | Problem | Handling | Spike |
 |---|---|---|---|
 | `run: echo ${{ secrets.TOKEN }}` in a code fence | `Unknown variable`, naming `secrets` | By design (R6). Error hint suggests `{% raw %}`, which works inside a fence | 3 |
-| `{{ company }}` with `company: "A<B"` | Value is read as MDX. `A<B, C` is an error, and `A<B and more` silently stays text | Use `{company}`. Error hint suggests it, and the unterminated tag check catches the silent case | 2, 3, 5 |
-| `<Card title="{{ t }}" />` with `t: 'Say "hi"'` | Value breaks the attribute with an error. With `&#35;` it silently changes to `#` | Use `{{ t \| attr }}`. Error hint suggests it, but nothing catches the silent case | 3 |
+| `{{ company }}` with `company: "A<B"` | Value is read as MDX. `A<B, C` is an error, and `A<B and more` silently stays text | Use `{company}`, or `{{ company \| text }}` in a loop. Error hint suggests them, and the unterminated tag check catches the silent case | 2, 3, 5 |
+| `{{ item.note }}` in a loop, with `*`, `&#35;`, or similar in the value | Value is read as MDX, and loop variables don't reach Expressions | Use `{{ item.note \| text }}`. Documented, because nothing can tell intended markup from data | 3, 5 |
+| `> {{ x }}` or `\| {{ x }} \|` with a multi-line value | Later lines silently leave the quote, or become a new table row | Use `{x}`, or `{{ x \| text }}` in a loop. Documented | 3, 5 |
+| `{{ x }}` with `x: "{y}"` | The value is evaluated, so this prints the value of `y` | Use `{x}`, or `{{ x \| text }}` in a loop. Documented | 3, 5 |
+| `{% raw %}{{ x }}{% endraw %}` in prose | Becomes the Expression `{ x }`, which is an error | Hint: write `\{\{ x }}`. In code, `{% raw %}` works | 3, 5 |
+| `{% raw %}{x}{% endraw %}` in prose | Silently prints the value of `x` | Documented. Write `\{x}` | 3, 5 |
+| `<Card title="{{ t }}" />` with `t: 'Say "hi"'` | Value breaks the attribute with an error. With `&#35;` it silently changes to `#` | Use `{{ t \| attr }}`. Error hint suggests it, but nothing catches the silent case, so it's documented | 3 |
+| `\| <Card title="{{ t \| attr }}" /> \|` with `a\|b` in `t` | Without escaping `\|`, a table header silently becomes a paragraph | `attr` escapes it | 3, 5 |
 | `{% for kv in obj %}`, `{{ obj }}` | Stock `liquid` prints in a random order per process, which breaks R23 | Sorted keys, through our [patch](adr/0005-sort-liquid-object-keys.md) | 3 |
 | `"now" \| date` | Reads the clock, which breaks R23 | Our own `date` filter gives an error suggesting frontmatter | 3 |
 | `{% if itmes %}`, a typo | Silently false, so content disappears | Documented. An open question in the PRD | 3 |
+| `{x<tab>\| upcase}` | Liquid's grammar rejects the tab | Turn tabs outside strings into spaces before wrapping | 3, 5 |
 | `{{ missing \| default: "x" }}` | An error, where Shopify's prints `x` | Hint: use `{% if %}`. An open question in the PRD | 3 |
-| `version: 1.10`, `zip: 02134`, `ok: yes` in frontmatter | Become `1.1`, `2134`, and `true` | Documented: quote them | 3 |
+| `version: 1.10`, `zip: 02134` in frontmatter | Become `1.1` and `2134` | Documented: quote them | 3 |
+| `draft: no` in frontmatter | Stays text, so `{% if draft %}` is true | Documented: use `true` and `false`. This is the cost of keeping `country: NO` as text | 5 |
+| `scores: { 2024: 1 }`, `o: { n: 1 }` | `liquid`'s value type fails, with `data did not match any variant` | Our own type reads every key as text | 5 |
+| `{{ d \| date: "%Y" }}` with `d: 2026-01-02` | The stock filter silently ignores the format | Our `date` filter reads it | 5 |
+| `{{ "hello" \| date: "%Y" }}` | Prints `hello`, as Shopify's does | Documented | 5 |
 | `{%` nested 5,000 or more levels deep | Aborts the process on the default stack | A thread with a large stack | 3 |
 | `{% for i in xs %}<Card title={i.name} />{% endfor %}` | `i` no longer exists when `{i.name}` runs | Confirmed: `Unknown variable`, naming `i`. Error hint suggests `{{ }}` | 3, 5 |
 | `<A style={{color: "red"}} />` | MDX habit, and Liquid claims the `{{`, giving `expected Literal`. `{{color}}` with a known name prints the value, and then the Dialect rejects it | Error hint explaining the difference | 3 |
 | `> a`, `{% if x %}`, `> b`, `{% endif %}` on separate lines | Blank lines split one quote into several, and `{%- -%}` glues lines together | Document `{%- if x %}` and `{%- endif %}`, which keep one quote whether `x` is true or false | 3 |
+| `The total is`, `{a}`, `for this year.` on three lines | The parser reads the middle line as a block, so one sentence would become three paragraphs | Join lines with no blank line between them | 5 |
+| `Before.`, `<P />`, `After.` on three lines | A tag alone on a line is a block, so these are three blocks | Documented | 5 |
+| `[a]({url})`, `![{x}](a.png)` | Expressions don't run there, so the link would point at `{url}` | Error, with a hint to use `{{ }}` | 5 |
 | `<Note>hi</Note>` alone on a line | Parses as inline | Unravel to block level | 2, 5 |
 | `Hello <Note /> there`, where `Note` has two paragraphs | Blocks in inline position | Error with location | 5 |
 | `    total` inside a tag | A paragraph in MDX, code in Markdown | Tree expansion and serialization | 1, 5 |
@@ -422,7 +456,12 @@ Small inputs likely to break a naive implementation. Each gets a test fixture, a
 | A table of 256 KB or more, perhaps from a Liquid loop | Takes 13 seconds or more to parse | Reported only. Consider a size limit | 2 |
 | `$5 and $6`, `Issue #42`, `// x`, `--`, `"quoted"` | Typst would read them as math, code, a comment, a dash, and a smart quote | String literals in stage 7 | 4 |
 | `你好` with the bundled fonts | Empty boxes, with no warning from Typst and exit code 0 | Report missing glyphs after layout, suggesting `fonts/` | 4 |
-| `नमस्ते`, `مرحبا` with the bundled fonts | Printed badly, with no missing glyphs, so no check can catch it | Document it, and suggest `fonts/` | 4 |
+| `नमस्ते`, `مرحبا` with the bundled fonts | Printed badly, with no missing glyphs, so no check can catch it | Documented, suggesting `fonts/` | 4 |
+| `three<tab>four`, or two spaces after a period | A string literal joins the words, or prints a wide gap | Collapse spaces and tabs in stage 7 | 4 |
+| A very long word, URL, or code line | Cut off at the page edge, with exit code 0 | Warn after layout, naming the page | 4 |
+| A table with too many columns | Cells overprint, with exit code 0 | Warn after layout, once that check stops flagging footnote markers | 4 |
+| `![a](my%20photo.png)` | File not found, because the path isn't decoded | Percent-decode image paths | 4 |
+| A footnote in the header of a table that spans pages | Prints on each page with a new number | `repeat: false` on that header | 4 |
 | An SVG linking to `../secret.png` or a URL | Could read outside the root | Typst refuses it | 4 |
 | A symlink leaving the asset root | Could read outside the root | `canonicalize` in `World::file` | 4 |
 | A footnote that references itself | Label doesn't exist yet, so Typst errors | Print the reference as text | 4 |
@@ -442,13 +481,16 @@ Small inputs likely to break a naive implementation. Each gets a test fixture, a
 | Two hard breaks in a row | The serializer writes a blank line, which splits the paragraph | The round-trip check reports an error | 1b |
 | `` "1. ```\n- x\n" ``: an unclosed fence in a list item, then a different kind of list | Panics stock `markdown` | Our fork parses it correctly. Stage 6 uses `pulldown-cmark`, so a Markdown Input is unaffected | 1b, 2 |
 | `- a`, two blank lines, then `# b` | `markdown` reports the list as spread, so it would turn loose and gain a dummy definition | Work out tight or loose from source lines | 1b |
+| `*w* x[^1]`, emphasis and a footnote in one paragraph | Stock `pulldown-cmark-to-cmark` refuses it | [The patch](#serialization) | 5 |
+| `<Content />` in a list item, given a table and then text | The table would absorb the text | Make the list loose | 5 |
+| A file ending right after the `<` in `a\|\|`, `-\|-`, `1. <` | The fork's last known panic | Stage 1 adds a final line ending | 2, 5 |
 | A table cell ending in `\`, such as `C:\dir\` | The serializer writes the `\` right before the cell's closing pipe, which then reads as an escaped pipe | The round-trip check reports an error | 1b |
 
 ## Delivery
 
 1. **Prepare.** Done: `.devcontainer/install.sh` installs Rust 1.92 or later when the container starts.
-2. **[Spikes](spikes.md).** Run them in the order given there and record findings. Update this document, and write an ADR for the Renderer once Spike 4 settles it. The spike code stays in `spikes/` as evidence, and Spike 1's suites move into the real tests.
-3. **Milestone 1: Markdown to PDF.** `mdx2pdf-cli` and `mdx2pdf-render`, Markdown Input, `--page`. This is already a useful tool, it proves the second half of the pipeline, and it doesn't need `markdown` at all.
-4. **Milestone 2: Projects without Components.** First create the [`markdown` fork](adr/0004-fork-the-markdown-parser.md) from its saved patches, and run its test suite. Apply the [`liquid-core` patch](adr/0005-sort-liquid-object-keys.md), and run the `liquid` workspace's tests with it. Then frontmatter, Liquid, Expressions, `--emit-md`, normalization, serialization, and the round-trip check.
+2. **[Spikes](spikes.md).** Done. The spike code stays in `spikes/` as evidence, and the suites from Spikes 1 and 5 move into the real tests.
+3. **Milestone 1: Markdown to PDF.** `mdx2pdf-cli` and `mdx2pdf-render`, Markdown Input, `--page`. This is already a useful tool, it proves the second half of the pipeline, and it doesn't need `markdown` at all. It includes a static Linux build in CI, with `check-determinism.sh` run on other machines, which settles R21 and R23's open question.
+4. **Milestone 2: Projects without Components.** First create the [`markdown` fork](adr/0004-fork-the-markdown-parser.md) from its saved patches, and run its test suite. Apply the [`liquid-core` patch](adr/0005-sort-liquid-object-keys.md), and run the `liquid` workspace's tests with it. Do the same for the [`pulldown-cmark-to-cmark` patch](adr/0007-patch-the-serializer-for-footnotes.md). Then frontmatter, Liquid, Expressions, `--emit-md`, normalization, serialization, and the round-trip check.
 5. **Milestone 3: Components.** Resolution, Props, `<Content />`, unraveling, recursion errors.
 6. **Milestone 4: Release.** Error-message hints for every known hazard, default styling, and prebuilt binaries.

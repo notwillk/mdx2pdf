@@ -1,0 +1,1015 @@
+=== [design] prd-example: pass
+MARKDOWN:
+# Q3 Report
+
+ > 
+ > **ALPHA**
+ > 
+ > Review **Alpha** before Q3 Report ships.
+
+ > 
+ > **BETA**
+ > 
+ > Review **Beta** before Q3 Report ships.
+=== [design] prd-example-without-filters: pass
+MARKDOWN:
+# Q3 Report
+
+ > 
+ > **ALPHA**
+ > 
+ > Review **Alpha** before Q3 Report ships.
+
+ > 
+ > **BETA**
+ > 
+ > Review **Beta** before Q3 Report ships.
+=== [design] nested-components-pass-children-on: pass
+MARKDOWN:
+Before outer.
+
+ > 
+ > Inner says:
+ > 
+ > Hello **world**.
+
+After outer.
+=== [design] content-in-quote-multi-paragraph: pass
+MARKDOWN:
+
+ > 
+ > Head
+ > 
+ > One.
+ > 
+ > Two.
+=== [design] content-in-list-item: pass
+MARKDOWN:
+- one
+- second
+=== [design] content-in-list-item-multi-paragraph: pass
+MARKDOWN:
+- one
+  
+  two
+
+- second
+=== [design] content-in-table-cell: pass
+MARKDOWN:
+|h|
+|-|
+|cell **text**|
+=== [design] content-in-table-cell-multi-paragraph: pass
+ERROR:
+components/Cell.mdx:3:3: `<Content>` is used inside a line of text or a table cell, but it expands to several blocks.
+hint: Put it on a line of its own, or give it a single paragraph.
+
+=== [design] content-used-twice: pass
+MARKDOWN:
+again
+
+---
+
+again
+=== [design] content-with-no-children: pass
+MARKDOWN:
+Before.
+
+After.
+=== [design] content-with-no-children-in-containers: pass
+MARKDOWN:
+
+ > 
+
+- 
+- b
+=== [design] content-in-a-heading: pass
+MARKDOWN:
+# the title
+=== [design] children-use-the-callers-scope: pass
+MARKDOWN:
+component hears: caller and caller
+=== [design] props-dont-reach-children: pass
+ERROR:
+index.mdx:1:13: `name` is undefined in `props`.
+
+=== [design] assign-doesnt-leak-out-of-a-component: pass
+ERROR:
+index.mdx:3: `y` is undefined.
+hint: In code, wrap literal braces in `{% raw %}`. In prose, write `\{\{`.
+
+=== [design] components-cant-read-the-entry-documents-frontmatter: pass
+ERROR:
+components/A.mdx:1: `title` is undefined.
+hint: In code, wrap literal braces in `{% raw %}`. In prose, write `\{\{`.
+
+=== [design] typed-props: pass
+MARKDOWN:
+## T (2)
+
+- a
+
+- b
+
+Flagged.
+=== [design] props-default: pass
+MARKDOWN:
+Note
+=== [design] props-required-missing: pass
+ERROR:
+index.mdx:1:1: `kind` is required by `A`.
+
+=== [design] props-undeclared: pass
+ERROR:
+index.mdx:1:1: `nope` isn't a declared Prop of `A`.
+hint: Declare it in the frontmatter of `A`, under `props`.
+
+=== [design] props-with-no-schema: pass
+ERROR:
+index.mdx:1:1: `x` isn't a declared Prop of `A`.
+hint: Declare it in the frontmatter of `A`, under `props`.
+
+=== [design] props-wrong-type: pass
+ERROR:
+index.mdx:1:1: `n` should be integer, and this is string.
+hint: A quoted attribute is a string. Pass other values as `n={3}`.
+
+=== [design] props-enum: pass
+ERROR:
+index.mdx:1:1: `k` must be one of a, b, not c.
+
+=== [design] spread-attribute: pass
+ERROR:
+index.mdx:1:1: Spread attributes such as `{...x}` aren't available.
+hint: Pass each Prop by name.
+
+=== [design] raw-in-code: pass
+MARKDOWN:
+
+```
+{{ x }} {% if %}
+```
+
+Span `{{ x }}` here.
+=== [design] escaped-braces-in-children: pass
+MARKDOWN:
+Text: {{ x }} and {% if y %} and {x}
+=== [design] raw-in-a-fence-in-children: pass
+MARKDOWN:
+
+```
+{{ x }}
+```
+=== [design] expressions-and-tags-stay-inert-in-code: pass
+MARKDOWN:
+Span `{x}` and `<B />`.
+
+```
+{x} <B />
+```
+=== [design] loop-generates-components: pass
+MARKDOWN:
+**one**
+
+**two**
+=== [design] loop-text-filter-with-hostile-values: pass
+MARKDOWN:
+Item A\<B end.
+
+Item \*x\* end.
+
+Item {y} end.
+
+Item # h end.
+
+Item &amp;#35; end.
+
+Item \`c\` end.
+
+Item a\|b end.
+
+Item \[l\](u) end.
+
+Item \<B /> end.
+
+Item line one
+line two end.
+
+|v|
+|-|
+|A\<B|
+|\*x\*|
+|{y}|
+|\# h|
+|&amp;#35;|
+|\`c\`|
+|a\|b|
+|\[l\](u)|
+|\<B />|
+|line one&#10;line two|
+=== [design] loop-attr-filter-with-hostile-values: pass
+MARKDOWN:
+Title: Say "hi".
+
+Title: it's.
+
+Title: AT&amp;T.
+
+Title: &amp;#35;.
+
+Title: a\|b.
+
+Title: \<B />.
+
+Title: {y}.
+
+|v|
+|-|
+|Title: Say "hi".|
+|Title: it's.|
+|Title: AT&amp;T.|
+|Title: &amp;#35;.|
+|Title: a\|b.|
+|Title: \<B />.|
+|Title: {y}.|
+=== [design] tag-alone-on-a-line-unravels: pass
+MARKDOWN:
+
+ > 
+ > hi
+=== [design] tags-on-two-lines-unravel: pass
+MARKDOWN:
+
+ > 
+ > a
+
+ > 
+ > b
+=== [design] tags-on-one-line-unravel: pass
+MARKDOWN:
+
+ > 
+ > a
+
+ > 
+ > b
+=== [design] tag-mid-sentence: pass
+MARKDOWN:
+Hello **you** there.
+=== [design] tag-mid-sentence-expanding-to-nothing: pass
+MARKDOWN:
+Foo  bar
+=== [design] tag-at-end-of-sentence-expanding-to-nothing: pass
+MARKDOWN:
+Foo
+=== [design] tag-mid-sentence-expanding-to-several-blocks: pass
+ERROR:
+index.mdx:1:7: `<Two>` is used inside a line of text or a table cell, but it expands to several blocks.
+hint: Put it on a line of its own, or give it a single paragraph.
+
+=== [design] tag-mid-sentence-expanding-to-a-heading: pass
+ERROR:
+index.mdx:1:7: `<H>` is used inside a line of text, but it expands to a Heading, not a paragraph.
+hint: Put it on a line of its own.
+
+=== [design] recursion-direct: pass
+ERROR:
+components/A.mdx:1:1: This is a recursion: A -> A.
+hint: A Component can't use itself, even under a Liquid condition.
+
+=== [design] recursion-indirect: pass
+ERROR:
+components/B.mdx:1:1: This is a recursion: A -> B -> A.
+hint: A Component can't use itself, even under a Liquid condition.
+
+=== [design] recursion-under-a-liquid-condition: pass
+ERROR:
+components/A.mdx:8:1: This is a recursion: A -> A.
+hint: A Component can't use itself, even under a Liquid condition.
+
+=== [design] same-label-in-two-components: pass
+MARKDOWN:
+[docs](/a)
+
+[docs](/b)
+=== [design] footnote-in-a-component-used-twice: pass
+MARKDOWN:
+Text1[^u1-1].
+
+Text2[^u2-1].
+
+[^u1-1]: Note 1.
+
+[^u2-1]: Note 2.
+=== [design] footnote-in-an-inline-component: pass
+MARKDOWN:
+See this[^u1-1] here.
+
+[^u1-1]: Note.
+=== [design] footnote-in-children-placed-twice: pass
+MARKDOWN:
+Body[^1].
+
+Body[^1].
+
+[^1]: N.
+=== [design] a-tree-with-no-markdown-form: pass
+ERROR:
+index.mdx: The expanded document can't be represented exactly in Markdown: expected Start(Link { link_type: Inline, dest_url: Boxed("/c"), title: Boxed(""), id: Borrowed("") }), the Markdown reads as Text(Inlined(InlineStr { inner: [91, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], len: 1 })).
+hint: `--emit-md` shows the Markdown. Common causes are a link inside a link, two hard breaks in a row, and a table cell ending in a backslash.
+
+=== [design] indented-text-in-a-tag-stays-text: pass
+MARKDOWN:
+
+ > 
+ > total
+=== [design] comment-drops: pass
+MARKDOWN:
+ab
+
+c
+=== [design] adjacent-text-merges: pass
+MARKDOWN:
+a1b
+=== [design] empty-value-in-emphasis-drops: pass
+MARKDOWN:
+a  b
+
+c
+=== [design] edge-whitespace-in-a-value-trims: pass
+MARKDOWN:
+*a*
+=== [design] expression-values-stay-data: pass
+MARKDOWN:
+A\<B
+
+\*x\*
+
+\# h
+
+https://a.b
+
+\[l\](u)
+
+\<B />
+
+{y}
+=== [design] expression-value-with-a-blank-line: pass
+MARKDOWN:
+a&#10;&#10;b
+=== [design] expression-in-every-container: pass
+MARKDOWN:
+# H V
+
+*eV* **sV** ~~dV~~ [lV](/u)
+
+- iV
+
+ > 
+ > qV
+
+|cV|
+|--|
+|bV|
+
+n[^1]
+
+[^1]: fV
+=== [design] filter-pipes-in-table-cells: pass
+MARKDOWN:
+|ABC|
+|---|
+|ABC|
+|\[ABC\]|
+=== [design] brace-in-a-string-in-an-expression: pass
+MARKDOWN:
+a!b
+=== [design] tab-in-an-expression: pass
+MARKDOWN:
+A
+=== [design] inline-tag-between-letters: pass
+MARKDOWN:
+&#120;*(a)*&#121;
+=== [design] quote-kept-together-around-liquid: pass
+MARKDOWN:
+
+ > 
+ > Items:
+ > 
+ > - a
+ > - b
+
+ > 
+ > a
+ > b
+ > d
+=== [design] tight-list-stays-tight: pass
+MARKDOWN:
+- a
+- b
+
+# h
+=== [design] grafted-list-in-a-quote-in-a-list: pass
+MARKDOWN:
+- top
+  
+   > 
+   > - one
+   > - two
+=== [design] adjacent-lists-from-two-components: pass
+MARKDOWN:
+- item
+
+* item
+=== [design] adjacent-ordered-lists-from-two-components: pass
+MARKDOWN:
+1. item
+
+1) item
+=== [design] list-then-paragraph-from-a-component: pass
+MARKDOWN:
+- item
+
+Text after.
+=== [design] paragraph-then-grafted-paragraph-stay-apart: pass
+MARKDOWN:
+Before.
+
+Middle.
+
+After.
+=== [design] object-order-is-sorted: pass
+MARKDOWN:
+a=2 m=3 z=1
+=== [design] meta-and-top-level-names: pass
+MARKDOWN:
+YXXX
+=== [design] no-frontmatter: pass
+MARKDOWN:
+Plain *text*.
+=== [design] empty-frontmatter: pass
+MARKDOWN:
+Plain.
+=== [design] crlf-file: pass
+MARKDOWN:
+# 1
+
+Line one
+line two
+=== [design] file-with-a-bom: pass
+MARKDOWN:
+# 1
+=== [design] components-directory-wins-over-root: pass
+MARKDOWN:
+From components.
+=== [design] component-in-the-project-root: pass
+MARKDOWN:
+From the root.
+=== [design] image-path-passes-through: pass
+MARKDOWN:
+![a](chart.png)
+
+![b](sub/x.png "title")
+=== [design] escaped-tag-stays-text: pass
+MARKDOWN:
+\<div> and \<Card /> and {x}
+=== [design] non-ascii-beside-literal-punctuation: pass
+MARKDOWN:
+é\*x\*é and при_вет\_ and これは\*です\*です
+=== [design] a-long-code-span-with-a-line-break: pass
+MARKDOWN:
+`aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa [bbbbbbbbbbbbbbbbbbbbbbbbbbbbb`
+=== [design] same-component-nested-in-its-own-children: pass
+MARKDOWN:
+
+ > 
+ >  > 
+ >  > x
+=== [design] content-in-a-footnote-definition: pass
+MARKDOWN:
+x[^u1-1]
+
+[^u1-1]: note text
+=== [design] tag-in-a-list-item-with-block-children: pass
+MARKDOWN:
+- one
+  
+  two
+
+- b
+=== [design] task-list-in-a-component: pass
+MARKDOWN:
+- [x] done
+- [ ] todo
+=== [design] blocks-grafted-into-a-quote: pass
+MARKDOWN:
+
+ > 
+ > # H
+ > 
+ > |a|
+ > |-|
+ > |b|
+ > 
+ > ```rust
+ > fn x() {}
+ > ```
+=== [design] component-expanding-to-nothing-between-blocks: pass
+MARKDOWN:
+A
+
+B
+=== [design] hard-break-in-children: pass
+MARKDOWN:
+
+ > 
+ > one  
+ > two
+=== [design] liquid-loop-in-a-component-generates-table-rows: pass
+MARKDOWN:
+|a|b|
+|-|-|
+|1|x|
+|2|y|
+=== [design] ordered-list-keeps-its-start: pass
+MARKDOWN:
+7. a
+8. b
+=== [design] multi-line-tag: pass
+MARKDOWN:
+x y
+=== [design] multi-line-tag-in-a-quote: pass
+MARKDOWN:
+
+ > 
+ > x
+=== [design] comment-in-a-table-cell: pass
+MARKDOWN:
+|ab|
+|--|
+|c|
+=== [design] entity-in-text: pass
+MARKDOWN:
+AT&amp;T © 2026 #1
+=== [design] expression-alone-on-a-line-stays-in-its-paragraph: pass
+MARKDOWN:
+The total is
+42
+for this year.
+=== [design] expression-on-the-last-line-of-a-paragraph: pass
+MARKDOWN:
+Hello
+42
+=== [design] expression-on-the-first-line-of-a-paragraph: pass
+MARKDOWN:
+42
+Hello
+=== [design] two-expressions-on-two-lines: pass
+MARKDOWN:
+42
+43
+=== [design] expression-alone-on-a-line-in-a-quote-and-a-list: pass
+MARKDOWN:
+
+ > 
+ > The total is
+ > 42
+ > for this year.
+
+- The total is
+  42
+  for this year.
+=== [design] comment-alone-on-a-line-in-a-paragraph: pass
+MARKDOWN:
+One
+two
+=== [design] empty-value-alone-on-a-line-in-a-paragraph: pass
+MARKDOWN:
+One
+two
+=== [design] expression-with-blank-lines-around-it-is-its-own-paragraph: pass
+MARKDOWN:
+One
+
+42
+
+two
+=== [design] tag-with-children-between-lines-stays-in-the-paragraph: pass
+MARKDOWN:
+Before.
+x
+After.
+=== [design] emphasis-and-a-footnote-in-one-paragraph: pass
+MARKDOWN:
+*w* x[^1] and **s**.
+
+[^1]: *n* here[^2].
+
+[^2]: m
+=== [design] table-then-paragraph-grafted-into-a-tight-list-item: pass
+MARKDOWN:
+- one
+  
+  |a|
+  |-|
+  |b|
+  
+  two
+
+- b
+=== [design] quote-then-paragraph-grafted-into-a-tight-list-item: pass
+MARKDOWN:
+- > q
+  
+  two
+
+- b
+=== [checks] unterminated-tag: pass
+ERROR:
+index.mdx:1:1: `<Card` has no closing `>`, so it would print as text.
+hint: To print a literal `<`, write `\<`. Otherwise, finish the tag.
+
+=== [checks] unterminated-tag-after-text: pass
+ERROR:
+index.mdx:1:1: `<Card` has no closing `>`, so it would print as text.
+hint: To print a literal `<`, write `\<`. Otherwise, finish the tag.
+
+=== [checks] unterminated-tag-in-prose: pass
+ERROR:
+index.mdx:1:23: Unexpected character `.` (U+002E) in attribute name, expected an attribute name character such as letters, digits, `$`, or `_`; `=` to initialize a value; whitespace before attributes; or the end of the tag
+hint: To print a literal `<`, write `\<`.
+
+=== [checks] liquid-value-reads-as-an-unterminated-tag: pass
+ERROR:
+index.mdx, after the Liquid Pass, line 1: `<B` has no closing `>`, so it would print as text.
+    A<B and more
+hint: A value from `{{ }}` is read as MDX. Print data with `{x}`, or with `{{ x | text }}` in a loop, and with `{{ x | attr }}` in a quoted attribute.
+
+=== [checks] liquid-value-breaks-the-dialect: pass
+ERROR:
+index.mdx, after the Liquid Pass, line 1: Unexpected character `,` (U+002C) in name, expected a name character such as letters, digits, `$`, or `_`; whitespace before attributes; or the end of the tag
+    A<B, C
+hint: A value from `{{ }}` is read as MDX. Print data with `{x}`, or with `{{ x | text }}` in a loop, and with `{{ x | attr }}` in a quoted attribute.
+
+=== [checks] quote-in-an-attribute-value: pass
+ERROR:
+index.mdx, after the Liquid Pass, line 1: Unexpected character `"` (U+0022) in attribute name, expected an attribute name character such as letters, digits, `$`, or `_`; `=` to initialize a value; whitespace before attributes; or the end of the tag
+    <Card title="Say "hi"" />
+hint: A value from `{{ }}` is read as MDX. Print data with `{x}`, or with `{{ x | text }}` in a loop, and with `{{ x | attr }}` in a quoted attribute.
+
+=== [checks] table-header-with-a-bare-pipe: pass
+ERROR:
+index.mdx:4:1: This looks like a table, but it's a paragraph, because the header and the delimiter row have different numbers of cells.
+hint: In a table cell, a filter's pipe needs a backslash: `\|`.
+
+=== [checks] table-body-with-a-bare-pipe: pass
+ERROR:
+index.mdx:6:5: Unexpected end of file in expression, expected a corresponding closing brace for `{`
+hint: In a table cell, a filter's pipe needs a backslash: `\|`.
+
+=== [checks] open-quote-on-line-1-of-a-long-file: pass
+ERROR:
+index.mdx:1:1: This Expression has a quote with no closing quote: `{it's}`.
+hint: A Liquid string needs both quotes. For literal braces, write `\{`.
+
+=== [checks] two-open-quotes-on-one-line: pass
+ERROR:
+index.mdx:1:1: Couldn't read the Expression `{it's} and {don't}`: expected Literal.
+
+=== [checks] open-quotes-swallowing-blocks: pass
+ERROR:
+index.mdx:1:1: This Expression contains a blank line, which usually means a stray quote or brace has swallowed the text after it.
+hint: Check its quotes. For literal braces, write `\{`.
+
+=== [checks] expression-with-a-blank-line: pass
+ERROR:
+index.mdx:1:1: This Expression contains a blank line, which usually means a stray quote or brace has swallowed the text after it.
+hint: Check its quotes. For literal braces, write `\{`.
+
+=== [checks] clock-in-liquid: pass
+ERROR:
+index.mdx: `now` and `today` aren't available, because output must not depend on the clock. Put the date in frontmatter.
+
+=== [checks] clock-in-liquid-through-a-variable: pass
+ERROR:
+index.mdx: `now` and `today` aren't available, because output must not depend on the clock. Put the date in frontmatter.
+
+=== [checks] clock-in-an-expression: pass
+ERROR:
+index.mdx:1:1: Couldn't read the Expression `{"now" | date: "%Y"}`: `now` and `today` aren't available, because output must not depend on the clock. Put the date in frontmatter.
+
+=== [checks] a-date-from-frontmatter-still-works: pass
+MARKDOWN:
+2026 01
+=== [checks] expression-containing-liquid-delimiters: pass
+ERROR:
+index.mdx, after the Liquid Pass, line 1: An Expression can't contain `{{`, `}}`, `{%`, or `%}`: `{{{ name }}}`.
+    { {{ name }} }
+hint: `{% raw %}` only stops Liquid, and its output is still read as MDX. In prose, write `\{\{`.
+
+=== [checks] expression-parse-error-quotes-the-author: pass
+ERROR:
+index.mdx:4:1: Couldn't read the Expression `{name name}`: expected Literal.
+
+=== [checks] raw-in-prose-becomes-an-expression: pass
+ERROR:
+index.mdx, after the Liquid Pass, line 1: Couldn't read the Expression `{{ x }}`: expected Value.
+    Show {{ x }} here.
+hint: `{% raw %}` only stops Liquid, and its output is still read as MDX. In prose, write `\{\{`.
+
+=== [checks] raw-tag-in-prose-becomes-an-expression: pass
+ERROR:
+index.mdx, after the Liquid Pass, line 1: Couldn't read the Expression `{% if y %}`: expected Value.
+    Show {% if y %} here.
+hint: `{% raw %}` only stops Liquid, and its output is still read as MDX. In prose, write `\{\%`.
+
+=== [checks] text-filter-in-an-expression: pass
+ERROR:
+index.mdx:4:1: `text` isn't available in an Expression, because its result is already data.
+hint: An Expression's result is already data, so it needs neither filter.
+
+=== [checks] capture-isnt-available-to-authors: pass
+ERROR:
+index.mdx:4: There's no `__capture` filter.
+
+=== [checks] secrets-in-a-fence: pass
+ERROR:
+index.mdx:2: `secrets` is undefined.
+hint: In code, wrap literal braces in `{% raw %}`. In prose, write `\{\{`.
+
+=== [checks] loop-variable-in-an-expression: pass
+ERROR:
+index.mdx, after the Liquid Pass, line 1: `i` is undefined.
+    <Card title={i.name} />
+hint: `i` only exists during the Liquid Pass, and Expressions run after it. Use `{{ i }}`, or `{{ i | text }}` for data, and `{{ i | attr }}` in an attribute.
+
+=== [checks] assign-variable-in-an-expression: pass
+ERROR:
+index.mdx, after the Liquid Pass, line 1: `y` is undefined.
+    {y}
+hint: `y` only exists during the Liquid Pass, and Expressions run after it. Use `{{ y }}`, or `{{ y | text }}` for data, and `{{ y | attr }}` in an attribute.
+
+=== [checks] mdx-style-object: pass
+ERROR:
+index.mdx:1:12: expected Literal
+hint: `{{` starts Liquid output here, so a tag can't take an object this way. Pass a value with `name={x}`.
+
+=== [checks] mdx-style-object-with-a-known-name: pass
+ERROR:
+index.mdx, after the Liquid Pass, line 1: Unexpected character `1` (U+0031) before attribute value, expected a character that can start an attribute value, such as `"`, `'`, or `{`
+    <A style=1 />
+hint: A value from `{{ }}` is read as MDX. Print data with `{x}`, or with `{{ x | text }}` in a loop, and with `{{ x | attr }}` in a quoted attribute.
+
+=== [checks] curly-braces-in-prose: pass
+ERROR:
+index.mdx:1:5: `curly` is undefined.
+hint: For literal braces, write `\{`.
+
+=== [checks] lowercase-tag: pass
+ERROR:
+index.mdx:1:1: `<div>`: lowercase tags such as `div` aren't available, because a document only produces Markdown.
+hint: Use a Component, or write a literal `<` as `\<`.
+
+=== [checks] unclosed-lowercase-tag: pass
+ERROR:
+index.mdx:1:1: Expected a closing tag for `<br>` (1:1)
+hint: HTML isn't available. Use a Component, and write a literal `<` as `\<`.
+
+=== [checks] html-comment: pass
+ERROR:
+index.mdx:3:2: Unexpected character `!` (U+0021) before name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a comment in MDX, use `{/* text */}`)
+hint: Write a comment as `{/* text */}`.
+
+=== [checks] autolink: pass
+ERROR:
+index.mdx:1:8: Unexpected character `/` (U+002F) before local name, expected a character that can start a name, such as a letter, `$`, or `_` (note: to create a link in MDX, use `[text](url)`)
+hint: Write a link as `[text](url)`.
+
+=== [checks] less-than-a-digit: pass
+ERROR:
+index.mdx:1:3: Unexpected character `1` (U+0031) before name, expected a character that can start a name, such as a letter, `$`, or `_`
+hint: To print a literal `<`, write `\<`.
+
+=== [checks] generic-type-in-prose: pass
+ERROR:
+index.mdx:1:9: Expected a closing tag for `<String>` (1:9) before the end of `Paragraph`
+hint: To print a literal `<`, write `\<`.
+
+=== [checks] import-statement: pass
+ERROR:
+index.mdx:1:1: `import` statements aren't available. Liquid is the only logic language.
+hint: Use a Component, which needs no `import`. If this is prose, write `&#105;mport`.
+
+=== [checks] import-with-braces: pass
+ERROR:
+index.mdx:1:1: `import` statements aren't available. Liquid is the only logic language.
+hint: Use a Component, which needs no `import`. If this is prose, write `&#105;mport`.
+
+=== [checks] export-statement: pass
+ERROR:
+index.mdx:1:1: `export` statements aren't available. Liquid is the only logic language.
+hint: Use a Component, which needs no `import`. If this is prose, write `&#101;xport`.
+
+=== [checks] import-in-prose-is-fine: pass
+MARKDOWN:
+import duties from China rose sharply
+=== [checks] export-in-prose-flagged-with-a-way-out: pass
+ERROR:
+index.mdx:1:1: `export` statements aren't available. Liquid is the only logic language.
+hint: Use a Component, which needs no `import`. If this is prose, write `&#101;xport`.
+
+=== [checks] export-escape-works: pass
+MARKDOWN:
+export class action lawsuits
+=== [checks] unknown-component: pass
+ERROR:
+index.mdx:1:1: `Nope` isn't a Component: there's no components/Nope.mdx or Nope.mdx.
+
+=== [checks] member-name: pass
+ERROR:
+index.mdx:1:1: `<Ns.Sub>`: namespaced Components aren't available yet.
+
+=== [checks] fragment: pass
+ERROR:
+index.mdx:1:1: Fragments such as `<>` aren't available.
+hint: Remove them, because a Component's children need no wrapper.
+
+=== [checks] content-in-the-entry-document: pass
+ERROR:
+index.mdx:1:1: `<Content />` has nothing to place in the Entry Document, because it isn't a Component.
+
+=== [checks] content-with-an-attribute: pass
+ERROR:
+components/A.mdx:1:1: `<Content />` takes no attributes or children.
+
+=== [checks] a-component-file-named-content: pass
+ERROR:
+components/Content.mdx: The name `Content` is reserved for `<Content />`, so a Component can't use it.
+
+=== [checks] undefined-name: pass
+ERROR:
+index.mdx:1: `missing` is undefined.
+hint: In code, wrap literal braces in `{% raw %}`. In prose, write `\{\{`.
+
+=== [checks] undefined-with-default: pass
+ERROR:
+index.mdx:1: `missing` is undefined.
+hint: In `liquid`, `default` needs a defined name. Test an optional value with `{% if %}`.
+
+=== [checks] array-in-text: pass
+ERROR:
+index.mdx:4:1: `{items}` is an array, which can't print as text.
+hint: Pass it to a Component as a Prop, or loop over it with `{% for %}`.
+
+=== [checks] object-in-text: pass
+ERROR:
+index.mdx:4:3: `{o}` is an object, which can't print as text.
+hint: Pass it to a Component as a Prop, or loop over it with `{% for %}`.
+
+=== [checks] null-in-text-prints-nothing: pass
+MARKDOWN:
+AB
+=== [checks] frontmatter-key-meta: pass
+ERROR:
+index.mdx: The frontmatter key `meta` is reserved.
+
+=== [checks] frontmatter-key-props-in-the-entry-document: pass
+ERROR:
+index.mdx: The frontmatter key `props` declares a Component's Props, and the Entry Document isn't a Component.
+
+=== [checks] frontmatter-bad-yaml: pass
+ERROR:
+index.mdx: Couldn't read the frontmatter: error: line 1 column 4: unclosed bracket '['  --> <input>:1:4   | 1 | a: [1   |    ^ unclosed bracket '['
+
+=== [checks] frontmatter-unclosed: pass
+ERROR:
+index.mdx:1: This file starts a frontmatter block with `---`, but never closes it.
+hint: Close it with a `---` line. To start a document with a thematic break, write `***`.
+
+=== [checks] ampersand-in-an-attribute: pass
+MARKDOWN:
+AT&amp;T
+=== [checks] unclosed-tag-before-a-setext-underline: pass
+ERROR:
+index.mdx:1:1: Expected a closing tag for `<A>` (1:1) before the end of `HeadingSetext`
+hint: To print a literal `<`, write `\<`.
+
+=== [checks] unclosed-fence-then-another-list: pass
+MARKDOWN:
+- ```
+  ```
+
+1. x
+=== [checks] unterminated-tag-in-prose-with-no-punctuation: pass
+ERROR:
+index.mdx:1:1: `<B` has no closing `>`, so it would print as text.
+hint: To print a literal `<`, write `\<`. Otherwise, finish the tag.
+
+=== [checks] the-forks-remaining-panic: pass
+MARKDOWN:
+|a||
+|-|-|
+
+1. \<
+=== [checks] expression-in-a-link-destination: pass
+ERROR:
+index.mdx:4:1: `{url}` is a link destination, and Expressions don't run there.
+hint: Use `{{ url }}`, which runs before the file is read as MDX.
+
+=== [checks] expression-in-image-alt: pass
+ERROR:
+index.mdx:4:1: Expressions don't run in an image's alt text or destination.
+hint: Use `{{ x | text }}`, which runs before the file is read as MDX.
+
+=== [checks] two-hard-breaks-in-a-row: pass
+ERROR:
+index.mdx: The expanded document can't be represented exactly in Markdown: expected HardBreak, the Markdown reads as End(Paragraph).
+hint: `--emit-md` shows the Markdown. Common causes are a link inside a link, two hard breaks in a row, and a table cell ending in a backslash.
+
+=== [checks] table-cell-ending-in-a-backslash: pass
+ERROR:
+index.mdx: The expanded document can't be represented exactly in Markdown: expected Text(Boxed("C:\\dir\\")), the Markdown reads as Text(Boxed("C:\\dir|")).
+hint: `--emit-md` shows the Markdown. Common causes are a link inside a link, two hard breaks in a row, and a table cell ending in a backslash.
+
+=== [checks] frontmatter-nested-keys-that-look-typed: pass
+MARKDOWN:
+1 2 3 4 5
+=== [checks] frontmatter-merge-keys: pass
+MARKDOWN:
+1 2
+=== [checks] frontmatter-infinity: pass
+ERROR:
+index.mdx: Couldn't read the frontmatter: error: line 1 column 4: non-finite float `.inf` rejected by the configured policy  --> <input>:1:4   | 1 | x: .inf   |    ^ non-finite float `.inf` rejected by the configured policy
+
+=== [checks] frontmatter-list: pass
+ERROR:
+index.mdx: Couldn't read the frontmatter: it has to be a list of `key: value` lines.
+
+=== [checks] date-from-a-yaml-timestamp: pass
+MARKDOWN:
+2026 03
+=== [checks] yes-no-y-and-n-stay-text-in-frontmatter: pass
+MARKDOWN:
+NO, SE yes y on true
+=== [limits] raw-braces-in-prose-are-evaluated: pass
+MARKDOWN:
+1
+=== [limits] a-liquid-value-with-braces-is-evaluated: pass
+MARKDOWN:
+secret
+=== [limits] multi-line-liquid-value-leaves-a-quote: pass
+MARKDOWN:
+
+ > 
+ > a
+
+b
+=== [limits] multi-line-liquid-value-makes-a-list-item: pass
+MARKDOWN:
+- a
+- b
+=== [limits] multi-line-liquid-value-splits-a-table-row: pass
+MARKDOWN:
+|h|
+|-|
+|a|
+|b|
+=== [limits] markup-in-a-liquid-value-is-markup: pass
+MARKDOWN:
+*y*
+=== [limits] entity-in-a-plain-attribute-changes: pass
+MARKDOWN:
+\#
+=== [limits] typo-in-an-if-drops-content: pass
+MARKDOWN:
+Before.
+
+After.
+=== [limits] yaml-numbers-change: pass
+MARKDOWN:
+1\.1 2134 1.10
+=== [limits] assign-can-shadow-meta: pass
+MARKDOWN:
+1
+=== [limits] untrimmed-liquid-splits-a-quote: pass
+MARKDOWN:
+
+ > 
+ > a
+
+ > 
+ > b
+
+ > 
+ > d
+=== [limits] indented-text-is-a-paragraph: pass
+MARKDOWN:
+Text:
+
+total
+=== [limits] date-filter-ignores-what-it-cant-read: pass
+MARKDOWN:
+hello
+=== [limits] yes-and-no-are-text-so-both-are-true-in-an-if: pass
+MARKDOWN:
+Draft no

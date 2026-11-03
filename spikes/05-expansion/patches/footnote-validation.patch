@@ -1,0 +1,38 @@
+--- a/src/render.rs
++++ b/src/render.rs
+@@ -1906,6 +1906,20 @@
+         expected.insert(0, Event::Start(Tag::Paragraph));
+         expected.push(Event::End(TagEnd::Paragraph));
+     }
++    // A footnote's definition is a block of its own, so the block being checked usually doesn't
++    // have it, and without one a reference reads as text. Supply them just for this check.
++    let notes: Vec<String> = expected
++        .iter()
++        .filter_map(|event| match event {
++            Event::FootnoteReference(label) => Some(format!("[^{label}]: x")),
++            _ => None,
++        })
++        .collect();
++    let markdown = if notes.is_empty() {
++        markdown
++    } else {
++        Cow::Owned(format!("{markdown}\n\n{}\n", notes.join("\n\n")))
++    };
+     {
+         // Definitions needed by this block are in `markdown`. An otherwise
+         // unresolved label can still become a link through an earlier block.
+@@ -1915,7 +1929,13 @@
+             None
+         };
+         let parser = Parser::new_with_broken_link_callback(&markdown, parser_options, Some(callback));
+-        let matches = TextMergeStream::new(parser).eq(expected.iter().cloned());
++        let actual: Vec<_> = TextMergeStream::new(parser).collect();
++        // Anything past the block is one of the definitions supplied above.
++        let matches = if notes.is_empty() {
++            actual == expected
++        } else {
++            actual.len() > expected.len() && actual[..expected.len()] == expected[..]
++        };
+         matches && !resolves_earlier
+     }
+ }

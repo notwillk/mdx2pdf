@@ -1,0 +1,41 @@
+--- src/main.rs
++++ src/main.rs
+@@ -219,7 +219,7 @@
+ fn emit_text(text: &str, mechanism: Mechanism) -> String {
+     match mechanism {
+         Mechanism::Table => escape_table(text),
+-        Mechanism::Literal => format!("#{};", string_literal(text)),
++        Mechanism::Literal => format!("#{};", string_literal(&if std::env::var("SPIKE_COLLAPSE").is_ok() { collapse(text) } else { text.to_string() })),
+     }
+ }
+ 
+@@ -1262,7 +1262,29 @@
+             }
+             println!("{} distinct result(s) in 20 runs in one process", distinct.len());
+         }
++        Some("probe") => probe(&args[1], &args[2], &args[3]),
++        Some("layoutcheck") => layout_check(&args[2..], &args[1]),
++        Some("headernote") => header_note(&args[1], &args[2]),
+         Some("child") => child(&args[1..]),
+         _ => eprintln!("usage: spike-typst run|deep|render ..."),
+     }
+ }
++
++include!("probe.rs");
++
++fn collapse(text: &str) -> String {
++    let mut out = String::with_capacity(text.len());
++    let mut last_space = false;
++    for c in text.chars() {
++        if c == ' ' || c == '\t' {
++            if !last_space {
++                out.push(' ');
++            }
++            last_space = true;
++        } else {
++            out.push(c);
++            last_space = false;
++        }
++    }
++    out
++}

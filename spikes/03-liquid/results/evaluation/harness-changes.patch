@@ -1,0 +1,17 @@
+--- src/main.rs
++++ src/main.rs
+@@ -866,6 +866,14 @@
+                 println!("{template:?}\n  {}", describe(&render(&parser, &template, &globals)));
+             }
+         }
++        Some("pipeline") => pipeline_suite(),
++        Some("placements") => attr_placements(),
++        Some("objprint") => object_print(),
++        Some("textfilter") => text_placements(),
++        Some("more") => pipeline_more(),
++        Some("tableloss") => table_loss(),
+         _ => eprintln!("usage: spike-liquid run|deep <label>"),
+     }
+ }
++
++include!("probe.rs");

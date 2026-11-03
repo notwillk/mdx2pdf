@@ -1,0 +1,20 @@
+--- attr as specified
+  double quotes (control): {"same": 20000}  first misses: {}
+  table body: {"dialect error": 1612, "same": 18388}  first misses: {"dialect error": "|&amp;`{x}%}AT&T"}
+  table header: {"same": 20000}  first misses: {}
+  list item: {"same": 20000}  first misses: {}
+  nested tag: {"same": 20000}  first misses: {}
+  single quotes: {"dialect error": 1622, "same": 18378}  first misses: {"dialect error": "\\='&b{"}
+--- attr plus | and '
+  double quotes (control): {"same": 20000}  first misses: {}
+  table body: {"same": 20000}  first misses: {}
+  table header: {"same": 20000}  first misses: {}
+  list item: {"same": 20000}  first misses: {}
+  nested tag: {"same": 20000}  first misses: {}
+  single quotes: {"same": 20000}  first misses: {}
+
+Whether the table survives. find_attribute above still finds the value when a table header turned into a paragraph, so this counts tables.
+attr as specified, table header: table kept 18388, silently not a table 1612, errors 0
+attr as specified, table body: table kept 18388, silently not a table 0, errors 1612
+attr plus | and ', table header: table kept 20000, silently not a table 0, errors 0
+attr plus | and ', table body: table kept 20000, silently not a table 0, errors 0

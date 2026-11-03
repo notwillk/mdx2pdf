@@ -1,0 +1,28 @@
+# Disposable. See docs/spikes.md, Spike 5. Run setup-vendor.sh before building.
+[package]
+name = "spike-expansion"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+liquid = "=0.26.11"
+liquid-core = { version = "=0.26.11", features = ["derive"] }
+serde = "1"
+serde-saphyr = "=2.0.0"
+markdown = "=1.0.0"
+pulldown-cmark = { version = "=0.13.6", default-features = false }
+pulldown-cmark-to-cmark = "=23.0.0"
+
+# The fork from ADR 0004, the patch from ADR 0005, and patches/footnote-validation.patch,
+# all built by setup-vendor.sh. Without that last one, see the findings.
+[patch.crates-io]
+markdown = { path = "vendor/markdown" }
+liquid-core = { path = "vendor/liquid-core" }
+pulldown-cmark-to-cmark = { path = "vendor/pulldown-cmark-to-cmark" }
+
+# The guards need this. It's the default, but the real crates must not switch to abort.
+[profile.release]
+panic = "unwind"
+
+[workspace]

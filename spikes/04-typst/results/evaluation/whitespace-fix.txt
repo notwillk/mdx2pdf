@@ -1,0 +1,9 @@
+With SPIKE_COLLAPSE set, which collapses spaces and tabs in string literals:
+    laid out: "one two three four\u{a0}five six A sentence. Another after two spaces, and \"quotes\" -- with dashes... done. "
+    laid out: "one two three four\u{a0}five six A sentence. Another after two spaces, and \"quotes\" -- with dashes... done. "
+13497cbd4bb80565197a839c9a78a0e7373975e680012c4a936f8bfa64199586  scratch/out3/ws-table.pdf
+13497cbd4bb80565197a839c9a78a0e7373975e680012c4a936f8bfa64199586  scratch/out3/ws-literal.pdf
+3ff7dfee03065dd186cdaa77681660f6b04ef71ea049263bac386dcba580dc80  scratch/out3/structure.pdf
+585ef0d08c93a150aeb5a356391bd93390d6215c42f02fa3175ce65d73de9c1d  scratch/out3/long.pdf
+
+structure and long match results/record/determinism.txt, so collapsing changes nothing there.
